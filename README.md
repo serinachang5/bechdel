@@ -1,1 +1,1 @@
-# bechdel
+# Automating the Bechdel Test
