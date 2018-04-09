@@ -1,11 +1,10 @@
-from csv import DictReader
 import pickle
-from project.src.util import standardize
+import csv
 import imdb
 import os
 import string
 
-DEBUGGING = False
+DEBUGGING = True
 
 def align_movie_info(type):
     movie_to_info = {}
@@ -13,7 +12,7 @@ def align_movie_info(type):
     found_id = 0
     found_dia = 0
 
-    if type == 'walker':
+    if type == 'walker' or type == 'w':
         walker_raw = './data/walker2015_raw/'
         for genre in os.listdir(walker_raw):
             if genre != '.DS_Store':
@@ -44,9 +43,8 @@ def align_movie_info(type):
                         movie_to_info[dialog_file_path] = info
                         print(dialog_file_path, info)
             pickle.dump(movie_to_info, open('walker_alignments.p', 'wb'))
-        print('Found {} dialog files, found {} ids'.format(found_dia, found_id))
 
-    if type == 'agarwal':
+    if type == 'agarwal' or type == 'a':
         agarwal_path = './data/agarwal2015_screenplays/'
         for dir in os.listdir(agarwal_path):
             if dir != '.DS_Store':
@@ -76,7 +74,48 @@ def align_movie_info(type):
                     print(found_dia, file_path, info)
             pickle.dump(movie_to_info, open('agarwal_alignments.p', 'wb'))
 
-        print('Found {} dialog files, found {} ids'.format(found_dia, found_id))
+    elif type == 'gorinski' or type == 'g':
+        gorinski_path = './data/gorinski/'
+        for dir in os.listdir(gorinski_path):
+            if dir != '.DS_Store':
+                print('Gorinski dir:', dir)
+                dir_path = gorinski_path + dir + '/'
+
+                for movie_folder in os.listdir(dir_path):
+                    found_dia += 1
+                    file_path = dir_path + movie_folder + '/script_clean.txt'
+                    if DEBUGGING: print('File_path:', file_path)
+
+                    info = {'source':'gorinski', 'title':None, 'id':None}
+                    title = find_gorinski_title(movie_folder)
+                    info['title'] = title
+                    if DEBUGGING: print('Title:', title)
+
+                    char_count, char_doc = parse_gorinski_chars(file_path)
+                    if DEBUGGING: print('Char count:', char_count, 'Chars:', char_doc)
+
+                    if char_count > 5:
+                        imdb_id = match_id(db, title, char_doc)
+                        if imdb_id is not None:
+                            found_id += 1
+                            info['id'] = imdb_id
+
+                    movie_to_info[file_path] = info
+                    print(found_dia, file_path, info)
+            pickle.dump(movie_to_info, open('gorinski_alignments.p', 'wb'))
+
+    print('Found {} dialog files, found {} ids'.format(found_dia, found_id))
+
+def write_to_csv(dictionary, save_file):
+    with open(save_file, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Title', 'Source', 'File_path', 'IMDb_id'])
+        sort_by_path = sorted(dictionary.items(), key=lambda x: x[0])
+        for path,info in sort_by_path:
+            source = info['source']
+            title = info['title']
+            id = info['id']
+            writer.writerow([title, source, path, id])
 
 def match_id(imdb_instance, title, char_doc):
     search_results = imdb_instance.search_movie(title)
@@ -152,4 +191,26 @@ def parse_agarwal_chars(file_path):
         char_doc = ' '.join(list(chars))
         return len(chars), char_doc
 
-align_movie_info(type='agarwal')
+# GORINKSI FUNCTIONS
+def find_gorinski_title(movie_folder):
+    title = movie_folder.split('(')[0]
+    title = title.strip().lower()
+    return title
+
+def parse_gorinski_chars(file_path):
+    with open(file_path, 'r') as f:
+        chars = set()
+        max_ls = 10
+        for line in f.readlines():
+            leading_space = len(line) - len(line.lstrip(' '))
+            if leading_space >= max_ls:
+                char = line.strip().upper()
+                chars.add(char)
+                max_ls = max(leading_space, max_ls)
+        char_doc = ' '.join(list(chars))
+        return len(chars), char_doc
+
+if __name__ == "__main__":
+    align_movie_info('g')
+    # dictionary = pickle.load(open('agarwal_alignments.p', 'rb'))
+    # write_to_csv(dictionary, 'agarwal_alignments.csv')
