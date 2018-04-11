@@ -4,7 +4,7 @@ import imdb
 import os
 import string
 
-DEBUGGING = True
+DEBUGGING = False
 
 def align_movie_info(type):
     movie_to_info = {}
@@ -82,26 +82,27 @@ def align_movie_info(type):
                 dir_path = gorinski_path + dir + '/'
 
                 for movie_folder in os.listdir(dir_path):
-                    found_dia += 1
-                    file_path = dir_path + movie_folder + '/script_clean.txt'
-                    if DEBUGGING: print('File_path:', file_path)
+                    if movie_folder != '.DS_Store':
+                        found_dia += 1
+                        file_path = dir_path + movie_folder + '/script_clean.txt'
+                        if DEBUGGING: print('File_path:', file_path)
 
-                    info = {'source':'gorinski', 'title':None, 'id':None}
-                    title = find_gorinski_title(movie_folder)
-                    info['title'] = title
-                    if DEBUGGING: print('Title:', title)
+                        info = {'source':'gorinski', 'title':None, 'id':None}
+                        title = find_gorinski_title(movie_folder)
+                        info['title'] = title
+                        if DEBUGGING: print('Title:', title)
 
-                    char_count, char_doc = parse_gorinski_chars(file_path)
-                    if DEBUGGING: print('Char count:', char_count, 'Chars:', char_doc)
+                        char_count, char_doc = parse_gorinski_chars(file_path)
+                        if DEBUGGING: print('Char count:', char_count, 'Chars:', char_doc)
 
-                    if char_count > 5:
-                        imdb_id = match_id(db, title, char_doc)
-                        if imdb_id is not None:
-                            found_id += 1
-                            info['id'] = imdb_id
+                        if char_count > 5:
+                            imdb_id = match_id(db, title, char_doc)
+                            if imdb_id is not None:
+                                found_id += 1
+                                info['id'] = imdb_id
 
-                    movie_to_info[file_path] = info
-                    print(found_dia, file_path, info)
+                        movie_to_info[file_path] = info
+                        print(found_dia, file_path, info)
             pickle.dump(movie_to_info, open('gorinski_alignments.p', 'wb'))
 
     print('Found {} dialog files, found {} ids'.format(found_dia, found_id))
@@ -211,6 +212,6 @@ def parse_gorinski_chars(file_path):
         return len(chars), char_doc
 
 if __name__ == "__main__":
-    align_movie_info('g')
-    # dictionary = pickle.load(open('agarwal_alignments.p', 'rb'))
-    # write_to_csv(dictionary, 'agarwal_alignments.csv')
+    # align_movie_info('g')
+    dictionary = pickle.load(open('gorinski_alignments.p', 'rb'))
+    write_to_csv(dictionary, 'gorinski_alignments.csv')
