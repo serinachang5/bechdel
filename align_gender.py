@@ -1,6 +1,8 @@
+from csv import DictReader
 import imdb
 import os
 import pickle
+import string
 
 '''
 Given: screenplay + IMDb id
@@ -54,7 +56,7 @@ def classify_chars(screenplay_fname, imdb_id, ssa_dict, db = None):
         db = imdb.IMDb()
     movie_by_id = db.get_movie(imdb_id)
     movie_year = int(movie_by_id['year'])
-    print(movie_year)
+    print('Year:', movie_year)
     decade_start = movie_year - 9
     ssa_name_scores = []
     for year in range(decade_start, movie_year+1):
@@ -81,23 +83,38 @@ def parse_agarwal_chars(file_path):
         chars = set()
         for line in f.readlines():
             if line.startswith('C|'):
-                char = line.rsplit(None, 1)[1]
+                char = line.split()[1]
+                char = char.strip('-')
                 char = char.lower()
-                chars.add(char)
+                if not char.startswith('('):
+                    chars.add(char)
         return chars
 
 if __name__ == "__main__":
     ssa_dict = pickle.load(open('parsed_ssa.p', 'rb'))
     print('Number of years in SSA parsed:', len(ssa_dict))
 
-    sample_path = './data/agarwal2015_screenplays/eva_test_set/51e2fe98144cce5b901a95dc_Slumdog_Millionaire.txt'
-    id = '1010048'
-    classifications = classify_chars(sample_path, id, ssa_dict)
-    for char,score in classifications.items():
-        gender = 'UNK'
-        if score is not None:
-            if score < .1:
-                gender = 'M'
-            elif score > .9:
-                gender = 'F'
-        print(char, gender)
+    agarwal_csv_fname = 'agarwal_alignments_with_IDs.csv'
+    agarwal_reader = DictReader(open(agarwal_csv_fname, 'r'))
+
+    db = imdb.IMDb()
+    count = 0
+    for row in agarwal_reader:
+        if count > 5:
+            break
+        else:
+            count += 1
+            path = row['File_path']
+            id = row['IMDb_id']
+            if id != '':
+                print('\n' + row['Title'].upper())
+                classifications = classify_chars(path, id, ssa_dict)
+                print('Number of characters:', len(classifications))
+                for char,score in classifications.items():
+                    gender = 'UNK'
+                    if score is not None:
+                        if score < .1:
+                            gender = 'M'
+                        elif score > .9:
+                            gender = 'F'
+                    print(char, gender)
