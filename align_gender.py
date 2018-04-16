@@ -2,7 +2,6 @@ from csv import DictReader
 import imdb
 import os
 import pickle
-import string
 
 '''
 Given: screenplay + IMDb id
