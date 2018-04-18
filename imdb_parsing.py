@@ -138,12 +138,15 @@ def match_id(imdb_instance, title, char_doc):
 def parse_bechdel():
     bechdel = json.load(open('./data/allmovies.json', 'r'))
     id_to_info = {}
+    id_len = None
     for movie in bechdel:
         imdbid = movie['imdbid']
+        if id_len is None:
+            id_len = len(imdbid)
         id_to_info[imdbid] = movie
-    return id_to_info
+    return id_to_info, id_len
 
-def align_id_to_bechdel(alignment_csv, bechdel_dict):
+def align_id_to_bechdel(alignment_csv, bechdel_dict, id_len):
     new_fname = alignment_csv.replace('.csv', '_with_bechdel.csv')
     reader = csv.DictReader(open(alignment_csv, 'r'))
     fieldnames = reader.fieldnames
@@ -155,14 +158,19 @@ def align_id_to_bechdel(alignment_csv, bechdel_dict):
     for row in reader:
         total += 1
         id = row['IMDb_id']
-        if id in bechdel_dict:
+        padded_id = pad_id(id, id_len)
+        if padded_id in bechdel_dict:
             found_bechdel += 1
-            row['Bechdel_rating'] = bechdel_dict[id]['rating']
+            row['Bechdel_rating'] = bechdel_dict[padded_id]['rating']
         else:
             row['Bechdel_rating'] = ''
         writer.writerow(row)
 
     print('Found {} scores for {} movies.'.format(found_bechdel, total))
+
+def pad_id(id, id_len):
+    padding = '0' * (id_len - len(id))
+    return padding + id
 
 # WALKER FUNCTIONS
 def get_walker_diag(raw_file_path):
@@ -245,6 +253,7 @@ if __name__ == "__main__":
     # align_movie_info('g')
     # dictionary = pickle.load(open('gorinski_alignments.p', 'rb'))
     # write_to_csv(dictionary, 'gorinski_alignments.csv')
-    bech_dict = parse_bechdel()
+    bech_dict, id_len = parse_bechdel()
     print('Bechdel scores:', len(bech_dict))
-    align_id_to_bechdel('./data/gorinski_alignments_with_IDs.csv', bech_dict)
+    print('ID length:', id_len)
+    align_id_to_bechdel('./data/gorinski_alignments_with_IDs.csv', bech_dict, id_len)

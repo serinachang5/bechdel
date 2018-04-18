@@ -82,6 +82,7 @@ def parse_agarwal_chars(file_path):
         chars = set()
         for line in f.readlines():
             if line.startswith('C|'):
+                # find closed set of prefix titles and remove
                 char = line.split()[1]
                 char = char.strip('-')
                 char = char.lower()
