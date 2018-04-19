@@ -2,7 +2,7 @@ from csv import DictReader
 import os
 import pickle
 
-MODE = 'gorinski'
+MODE = 'agarwal'
 
 # return dict: year -> list of name_tuples
 def parse_SSA():
@@ -200,14 +200,16 @@ def parse_gorinski_chars(file_path, prefixes):
                             root_to_info[root] = [None, {var}]
         return root_to_info
 
-def write_to_file(title, str_year, path, root_to_info, save_dir):
-    file_name = '_'.join(title.split())
-    file_name += '_' + str_year + '.txt'
+def write_to_file(row, root_to_info, save_dir):
+    file_name = '_'.join(row['Title'].split())
+    file_name += '_' + row['Year'] + '.txt'
     found = 0
     with open(save_dir + file_name, 'w') as f:
-        f.write(title.upper() + '\n')
-        f.write(str_year + '\n')
-        f.write(path + '\n')
+        f.write(row['Title'].upper() + '\n')
+        f.write('Year: ' + row['Year'] + '\n')
+        f.write('IMDb id: ' + row['IMDb_id'] + '\n')
+        f.write('Bechdel score: ' + row['Bechdel_rating'] + '\n')
+        f.write('File path: ' + row['File_path'] + '\n')
 
         f.write('\nCHARACTERS\n')
         offset = '   '
@@ -249,6 +251,6 @@ if __name__ == "__main__":
             count += 1
             print('\n' + str(count), row['Title'].upper(), row['Year'])
             root_to_info = classify_chars(row['File_path'], int(row['Year']), ssa_dict, mode=MODE)
-            num_assigned = write_to_file(row['Title'], row['Year'], row['File_path'], root_to_info, save_dir)
+            num_assigned = write_to_file(row, root_to_info, save_dir)
             print('Number of root names:', len(root_to_info))
             print('Number of gender matches made:', num_assigned)
