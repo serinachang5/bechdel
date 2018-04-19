@@ -153,6 +153,8 @@ def align_id_to_bechdel(alignment_csv, bechdel_dict, id_len):
     fieldnames.append('Bechdel_rating')
     fieldnames.append('Year')
     writer = csv.DictWriter(open(new_fname, 'w'), fieldnames)
+    first_row = {x:x for x in fieldnames}
+    writer.writerow(first_row)
 
     found_bechdel = 0
     total = 0
@@ -258,4 +260,4 @@ if __name__ == "__main__":
     bech_dict, id_len = parse_bechdel()
     print('Bechdel scores:', len(bech_dict))
     print('ID length:', id_len)
-    align_id_to_bechdel('./data/agarwal_alignments_with_IDs.csv', bech_dict, id_len)
+    align_id_to_bechdel('./data/gorinski_alignments_with_IDs.csv', bech_dict, id_len)

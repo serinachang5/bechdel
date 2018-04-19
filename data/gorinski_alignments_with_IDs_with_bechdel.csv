@@ -1,3 +1,4 @@
+Title,Source,File_path,IMDb_id,Bechdel_rating,Year
 12 and holding,gorinski,./data/gorinski/dev/12 and Holding/script_clean.txt,417385,3,2005
 30 minutes or less,gorinski,./data/gorinski/dev/30 Minutes or Less/script_clean.txt,1622547,1,2011
 a night at the roxbury,gorinski,./data/gorinski/dev/A Night at the Roxbury/script_clean.txt,120770,,

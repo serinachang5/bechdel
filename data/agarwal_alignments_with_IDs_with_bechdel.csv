@@ -1,3 +1,4 @@
+Title,Source,File_path,IMDb_id,Bechdel_rating,Year
 slumdog millionaire,agarwal,./data/agarwal2015_screenplays/eva_test_set/51e2fe98144cce5b901a95dc_Slumdog_Millionaire.txt,1010048,1,2008
 silver linings playbook,agarwal,./data/agarwal2015_screenplays/eva_test_set/51e301b71f7f8ee49901b143_Silver_Linings_Playbook.txt,1045658,3,2012
 bridesmaids,agarwal,./data/agarwal2015_screenplays/eva_test_set/51e301b81f7f8ee49901b19b_Bridesmaids.txt,1478338,3,2011
