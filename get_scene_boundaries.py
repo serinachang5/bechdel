@@ -59,7 +59,7 @@ if __name__ == "__main__":
 		count = 1
 		scenes = get_boundaries(item[2])
 		for s in scenes:
-			output_file = open(original_name+item[0]+"_scenes/"+str(count), 'w')
+			output_file = open(original_name+item[0]+"_scenes/"+str(count)+".txt", 'w')
 			count +=1
 			output_file.writelines(["%s\n" % item for item in s])
 
