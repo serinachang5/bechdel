@@ -162,6 +162,7 @@ def align_id_to_bechdel(alignment_csv, bechdel_dict, id_len):
         total += 1
         id = row['IMDb_id']
         padded_id = pad_id(id, id_len)
+        row['IMDb_id'] = padded_id
         if padded_id in bechdel_dict:
             found_bechdel += 1
             row['Bechdel_rating'] = bechdel_dict[padded_id]['rating']
@@ -257,7 +258,10 @@ if __name__ == "__main__":
     # align_movie_info('g')
     # dictionary = pickle.load(open('gorinski_alignments.p', 'rb'))
     # write_to_csv(dictionary, 'gorinski_alignments.csv')
+
+    MODE = 'agarwal'
+
     bech_dict, id_len = parse_bechdel()
     print('Bechdel scores:', len(bech_dict))
     print('ID length:', id_len)
-    align_id_to_bechdel('./data/gorinski_alignments_with_IDs.csv', bech_dict, id_len)
+    align_id_to_bechdel('./data/' + MODE + '_alignments_with_IDs.csv', bech_dict, id_len)

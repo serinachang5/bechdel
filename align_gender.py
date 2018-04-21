@@ -2,8 +2,6 @@ from csv import DictReader
 import os
 import pickle
 
-MODE = 'agarwal'
-
 # return dict: year -> list of name_tuples
 def parse_SSA():
     path = './data/names/'
@@ -235,15 +233,13 @@ def write_to_file(row, root_to_info, save_dir):
     return found
 
 if __name__ == "__main__":
+    MODE = 'gorinski'
+
     ssa_dict = pickle.load(open('parsed_ssa.p', 'rb'))
     print('Number of years in SSA parsed:', len(ssa_dict))
 
-    if MODE == 'agarwal':
-        reader = DictReader(open('./data/agarwal_alignments_with_IDs_with_bechdel.csv', 'r'))
-        save_dir = './movie_by_gender/agarwal/'
-    else:
-        reader = DictReader(open('./data/gorinski_alignments_with_IDs_with_bechdel.csv', 'r'))
-        save_dir = './movie_by_gender/gorinski/'
+    reader = DictReader(open('./data/' + MODE + '_alignments_with_IDs_with_bechdel.csv', 'r'))
+    save_dir = './movie_by_gender/' + MODE + '/'
 
     count = 0
     for row in reader:
