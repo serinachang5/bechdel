@@ -1,6 +1,8 @@
 import csv
 import os
 
+sc_files = set()
+
 # retrieve sample set for movie titles with ids
 # sample set - size 10
 def getSampleSet(dataset):
@@ -53,6 +55,7 @@ def get_boundaries_gorinski(filepath):
 		contents = fp.readlines()
 		for idx, line in enumerate(contents):
 			if ":SC:" in line:
+				sc_files.add(filepath)
 				scene_points.append(idx)
 			script_content.append(line)
 
@@ -88,6 +91,8 @@ if __name__ == "__main__":
 			count +=1
 			output_file.writelines(["%s\n" % item for item in s])
 
+	g_scenes = open("data/gorinski_files_with_scenes.txt", "w")
+	g_scenes.writelines(["%s\n" % item  for item in list(sc_files)])
 
 
 
