@@ -54,7 +54,7 @@ def get_boundaries_gorinski(filepath):
 	with open(filepath) as fp:
 		contents = fp.readlines()
 		for idx, line in enumerate(contents):
-			if ":SC:" in line:
+			if ":SC:" in line or "EXT." in line or "INT." in line:
 				sc_files.add(filepath)
 				scene_points.append(idx)
 			script_content.append(line)
