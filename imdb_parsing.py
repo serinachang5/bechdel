@@ -159,6 +159,10 @@ def align_id_to_bechdel(alignment_csv, bechdel_dict, id_len):
     found_bechdel = 0
     total = 0
     for row in reader:
+        path = row['File_path']
+        # skip agarwals without good tags
+        if path.startswith('./data/agarwal2015_screenplays/fail_wo_tags'):
+            continue
         total += 1
         id = row['IMDb_id']
         padded_id = pad_id(id, id_len)
