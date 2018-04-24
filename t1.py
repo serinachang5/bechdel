@@ -131,16 +131,16 @@ if __name__ == "__main__":
     rb = RuleBased()
 
     print('RULE-BASED: HARD')
+    pred = rb.predict(X_test, mode='hard')
+    print(eval(y_test, pred, verbose=True))
     pred = rb.predict(np.concatenate((X_train, X_val, X_test)), mode='hard')
     print(eval(np.concatenate((y_train, y_val, y_test)), pred, verbose=True))
-    pred = rb.predict(X_test, mode='hard')
-    print(eval(y_test, pred, verbose=True))
 
     print('\nRULE-BASED: SOFT')
-    pred = rb.predict(np.concatenate((X_train, X_val, X_test)), mode='soft')
-    print(eval(np.concatenate((y_train, y_val, y_test)), pred, verbose=True))
     pred = rb.predict(X_test, mode='hard')
     print(eval(y_test, pred, verbose=True))
+    pred = rb.predict(np.concatenate((X_train, X_val, X_test)), mode='soft')
+    print(eval(np.concatenate((y_train, y_val, y_test)), pred, verbose=True))
 
     clf = T1Classifier()
 
