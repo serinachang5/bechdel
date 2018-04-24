@@ -1,10 +1,14 @@
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
 import numpy as np
+import pickle
 from project.src.util import get_data, check_distribution
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
-import pickle
 
 def get_t1_data():
     combined_data = get_data()
@@ -45,22 +49,20 @@ def eval(true, pred, verbose = False):
         report += '\n' + str(confusion_matrix(true, pred))
     return report
 
-class Baselines:
+class RuleBased:
     def predict(self, X, mode = 'hard'):
+        assert(mode == 'hard' or mode == 'soft')
         if mode == 'hard':
             pred = []
             for x in X:
-                pred.append(self.make_rule_based_prediction1(x))
-        elif mode == 'soft':
+                pred.append(self.predict_hard(x))
+        else:
             pred = []
             for x in X:
-                pred.append(self.make_rule_based_prediction2(x))
-        else:
-            print('Not a valid prediction mode.')
-            return None
+                pred.append(self.predict_soft(x))
         return np.array(pred)
 
-    def make_rule_based_prediction1(self, char_dict):
+    def predict_hard(self, char_dict):
         fem_count = 0
         for root, (gen, score, variants) in char_dict.items():
             if gen == 'F':
@@ -69,7 +71,7 @@ class Baselines:
                 return 1
         return 0
 
-    def make_rule_based_prediction2(self, char_dict):
+    def predict_soft(self, char_dict):
         fem_count = 0
         for root, (gen, score, variants) in char_dict.items():
             if score != 'None' and float(score) > .5:
@@ -78,10 +80,9 @@ class Baselines:
                 return 1
         return 0
 
-
-class T1_Classifier:
+class T1Classifier:
     def __init__(self):
-        self.clf = DecisionTreeClassifier()
+        self.clf = LinearSVC()
         self.trained = False
 
     def get_features(self, X):
@@ -99,9 +100,9 @@ class T1_Classifier:
         X = X_as_features
         return X
 
-    def train(self, X, y, resample = True):
+    def train(self, X, y, oversample = True):
         X = self.get_features(X)
-        if resample:
+        if oversample:
             oversampler = SMOTE()
             X, y = oversampler.fit_sample(X, y)
         self.clf.fit(X, y)
@@ -117,7 +118,7 @@ class T1_Classifier:
 if __name__ == "__main__":
     # X, y = get_t1_data()
     # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
-
+    #
     # print(Counter(y_train))
     # print(Counter(y_val))
     # print(Counter(y_test))
@@ -127,19 +128,28 @@ if __name__ == "__main__":
     X_val = [x[1] for x in X_val]
     X_test = [x[1] for x in X_test]
 
-    baselines = Baselines()
+    rb = RuleBased()
 
-    pred = baselines.predict(np.concatenate((X_train, X_val, X_test)), mode='hard')
+    print('RULE-BASED: HARD')
+    pred = rb.predict(np.concatenate((X_train, X_val, X_test)), mode='hard')
     print(eval(np.concatenate((y_train, y_val, y_test)), pred, verbose=True))
+    pred = rb.predict(X_test, mode='hard')
+    print(eval(y_test, pred, verbose=True))
 
-    pred = baselines.predict(np.concatenate((X_train, X_val, X_test)), mode='soft')
-    print('\n' + eval(np.concatenate((y_train, y_val, y_test)), pred, verbose=True))
+    print('\nRULE-BASED: SOFT')
+    pred = rb.predict(np.concatenate((X_train, X_val, X_test)), mode='soft')
+    print(eval(np.concatenate((y_train, y_val, y_test)), pred, verbose=True))
+    pred = rb.predict(X_test, mode='hard')
+    print(eval(y_test, pred, verbose=True))
 
-    clf = T1_Classifier()
-    clf.train(np.concatenate((X_train, X_val)), np.concatenate((y_train, y_val)), resample=False)
+    clf = T1Classifier()
+
+    print('\nCLF: WITHOUT OVERSAMPLING')
+    clf.train(np.concatenate((X_train, X_val)), np.concatenate((y_train, y_val)), oversample=False)
     pred = clf.predict(X_test)
-    print('\n' + eval(y_test, pred, verbose=True))
+    print(eval(y_test, pred, verbose=True))
 
-    clf.train(np.concatenate((X_train, X_val)), np.concatenate((y_train, y_val)), resample=True)
+    print('\nCLF: WITH OVERSAMPLING')
+    clf.train(np.concatenate((X_train, X_val)), np.concatenate((y_train, y_val)), oversample=True)
     pred = clf.predict(X_test)
-    print('\n' + eval(y_test, pred, verbose=True))
+    print(eval(y_test, pred, verbose=True))

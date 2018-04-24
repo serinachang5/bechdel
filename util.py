@@ -31,20 +31,20 @@ def parse_by_gender_file(path_to_file):
         info = [title, year, imdb_id, bechdel, path, char_dict]
         return imdb_id, info
 
-def get_data(mode = 'combined'):
+def get_data(source = 'combined'):
     path = './movie_by_gender/'
 
-    if mode == 'agarwal' or mode == 'gorinski':
+    if source == 'agarwal' or source == 'gorinski':
         id_to_info = {}
-        for fname in os.listdir(path + mode + '/'):
-            id, info = parse_by_gender_file(path + mode + '/' + fname)
+        for fname in os.listdir(path + source + '/'):
+            id, info = parse_by_gender_file(path + source + '/' + fname)
             id_to_info[id] = info
-        # print('Unique movies in ' + mode.capitalize() + ':', len(id_to_info))
+        # print('Unique movies in ' + source.capitalize() + ':', len(id_to_info))
         return id_to_info
 
-    elif mode == 'combined':
-        aga = get_data(mode='agarwal')
-        gor =  get_data(mode='gorinski')
+    elif source == 'combined':
+        aga = get_data(source='agarwal')
+        gor =  get_data(source='gorinski')
         combined = aga
         overlap = 0
         for id in gor:
@@ -68,6 +68,13 @@ def check_distribution(data, test = None):
             label = 1 if score >= test else 0
             counts[label] += 1
     return counts
+
+def get_variant_as_key(char_dict):
+    var2info = {}
+    for char,(gen, score, variants) in char_dict.items():
+        for v in variants:
+            var2info[v] = (char, gen, score)
+    return var2info
 
 def parse_json(fname):
     with open(fname, "r") as f:

@@ -44,7 +44,7 @@ def get_name_scores(ssa_fname):
     return name_to_counts
 
 # return dict: root -> [gen_score, variants]
-def classify_chars(screenplay_fname, movie_year, ssa_dict, mode):
+def classify_chars(screenplay_fname, movie_year, ssa_dict, source):
     MALE_PREFIX = ['mr', 'mister', 'duke', 'father', 'brother', 'monsieur', 'prince', 'sir']
     FEMALE_PREFIX = ['ms', 'miss', 'mrs', 'duchess', 'mother', 'sister', 'mademoiselle', 'mlle',
                      'madame', 'princess']
@@ -60,9 +60,9 @@ def classify_chars(screenplay_fname, movie_year, ssa_dict, mode):
             ssa_name_scores.append(ssa_dict[year])
 
     root_to_info = None
-    if mode == 'agarwal':
+    if source == 'agarwal':
         root_to_info = parse_agarwal_chars(screenplay_fname, prefixes)
-    elif mode == 'gorinski':
+    elif source == 'gorinski':
         root_to_info = parse_gorinski_chars(screenplay_fname, prefixes)
 
     for root,(gen, vars) in root_to_info.items():
@@ -135,6 +135,7 @@ def parse_agarwal_chars(file_path, prefixes):
                         else:
                             root_to_info[root] = [None, {var}]
         return root_to_info
+
 
 def parse_gorinski_chars(file_path, prefixes):
     male_pre, fem_pre, neu_pre = prefixes
@@ -233,20 +234,20 @@ def write_to_file(row, root_to_info, save_dir):
     return found
 
 if __name__ == "__main__":
-    MODE = 'gorinski'
+    SOURCE = 'agarwal'
 
     ssa_dict = pickle.load(open('parsed_ssa.p', 'rb'))
     print('Number of years in SSA parsed:', len(ssa_dict))
 
-    reader = DictReader(open('./data/' + MODE + '_alignments_with_IDs_with_bechdel.csv', 'r'))
-    save_dir = './movie_by_gender/' + MODE + '/'
+    reader = DictReader(open('./data/' + SOURCE + '_alignments_with_IDs_with_bechdel.csv', 'r'))
+    save_dir = './movie_by_gender/' + SOURCE + '/'
 
     count = 0
     for row in reader:
         if row['Bechdel_rating'] != '':
             count += 1
             print('\n' + str(count), row['Title'].upper(), row['Year'])
-            root_to_info = classify_chars(row['File_path'], int(row['Year']), ssa_dict, mode=MODE)
+            root_to_info = classify_chars(row['File_path'], int(row['Year']), ssa_dict, source=SOURCE)
             num_assigned = write_to_file(row, root_to_info, save_dir)
             print('Number of root names:', len(root_to_info))
             print('Number of gender matches made:', num_assigned)

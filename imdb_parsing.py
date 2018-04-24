@@ -263,9 +263,9 @@ if __name__ == "__main__":
     # dictionary = pickle.load(open('gorinski_alignments.p', 'rb'))
     # write_to_csv(dictionary, 'gorinski_alignments.csv')
 
-    MODE = 'agarwal'
+    SOURCE = 'agarwal'
 
     bech_dict, id_len = parse_bechdel()
     print('Bechdel scores:', len(bech_dict))
     print('ID length:', id_len)
-    align_id_to_bechdel('./data/' + MODE + '_alignments_with_IDs.csv', bech_dict, id_len)
+    align_id_to_bechdel('./data/' + SOURCE + '_alignments_with_IDs.csv', bech_dict, id_len)
