@@ -37,7 +37,6 @@ def get_data(source = 'combined'):
         for fname in os.listdir(path + source + '/'):
             id, info = parse_by_gender_file(path + source + '/' + fname)
             id_to_info[id] = info
-        # print('Unique movies in ' + source.capitalize() + ':', len(id_to_info))
         return id_to_info
 
     elif source == 'combined':
@@ -50,8 +49,6 @@ def get_data(source = 'combined'):
                 combined[id] = gor[id]
             else:
                 overlap += 1
-        # print('Overlap between Agarwal and Gorinski:', overlap)
-        print('Unique movies in Combined:', len(combined))
         return combined
 
 def check_distribution(data, test = None):
