@@ -7,7 +7,6 @@ def get_gender_by_movie():
 
 	count = 0
 
-
 	gender_in_movies_agarwal = {}
 
 	for filename in all_files:
@@ -22,7 +21,7 @@ def get_gender_by_movie():
 
 
 		with open("data/movie_by_gender/agarwal/"+filename) as fp:
-			if count < 1:
+			if count < 3:
 				contents = fp.readlines()
 				gender_in_movies_agarwal[contents[4][11:]] = []
 				for idx, line in enumerate(contents):
@@ -50,17 +49,24 @@ def get_gender_by_movie():
 				if "Variants:" in c:
 					if len(char[i:]) != 1:
 					 	store_variants.append(tuple(char[i+1:]))
+
 		
 		if len(store_variants) > 0 and len(store_gender) > 0:
 			for g, v in zip(store_gender, store_variants):
 				concat.append((g,) + v)
-			new_concat = [':'.join(x).replace(' ', '').replace('\n', '') for x in concat]
-			print(new_concat)
+				new_concat = [':'.join(x).replace(' ', '').replace('\n', '') for x in concat]
+			
+				gender_in_movies_agarwal[contents[4][11:]] = new_concat
+
+	return gender_in_movies_agarwal
+			
+
 
 
 if __name__ == "__main__":
 
-	get_gender_by_movie()
+	agarwal_movie_genders = get_gender_by_movie()
+	print(agarwal_movie_genders)
 
 
 
