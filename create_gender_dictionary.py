@@ -1,3 +1,4 @@
+import itertools
 import os
 import pickle
 
@@ -25,7 +26,7 @@ def get_gender_by_movie(path):
 
 		with open(path+filename) as fp:
 			contents = fp.readlines()
-			gender_in_movies_agarwal[contents[4][11:]] = []
+			gender_in_movies[contents[4][11:].replace("\n", "")] = []
 			for idx, line in enumerate(contents):
 				if line[0:5] == "Root:":
 					chars.append(idx)
@@ -51,10 +52,10 @@ def get_gender_by_movie(path):
 		
 		if len(store_variants) > 0 and len(store_gender) > 0:
 			for g, v in zip(store_gender, store_variants):
-				concat.append((g,) + v)
-				new_concat = [':'.join(x).replace(' ', '').replace('\n', '') for x in concat]
+				concat.append([g] + list(v))
+				new_concat = [[s.strip() for s in inner] for inner in concat]
 			
-				gender_in_movies[contents[4][11:]] = new_concat
+				gender_in_movies[contents[4][11:].replace("\n", "")] = new_concat
 
 	return gender_in_movies
 
