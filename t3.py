@@ -11,14 +11,21 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
-from t2 import T2RuleBased
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from t2 import T2RuleBased, T2Classifier
 
 '''PREPARE DATA'''
 def get_t3_data(source = 'combined'):
     data = get_data(source)
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # (id, path, char dict)
-    y = np.array([1 if int(x[1][3]) >= 3 else 0 for x in data], dtype=np.int)  # check if sample passes T1
+    X = []
+    y = []
+    for x in data:
+        rating = int(x[1][3])
+        if rating >= 2:  # only include those that passed 2
+            X.append((x[0], x[1][4], x[1][5]))  # (id, path, char dict)
+            label = 1 if rating == 3 else 0  # check if sample passes T3
+            y.append(label)
     return X, y
 
 
@@ -45,6 +52,8 @@ def get_char_diag_list(scene, var2info, source):
                         diag.append(line)
                         idx += 1
                     char_diag_list.append((curr_char, diag))
+                else:
+                    idx += 1
             else:
                 idx += 1
 
@@ -155,33 +164,7 @@ class T3RuleBased:
                 male_chars.add(char)
         return male_chars
 
-    def get_ff_conversations(self, char_diag_list):
-        ffs = []
-        prev_char = ''
-        prev_score = -1
-        prev_line = ''
-        idx = 0
-        while idx < len(char_diag_list):
-            (char, gen, score), diag = char_diag_list[idx]
-            if score != 'None' and float(score) > .5 and \
-                    prev_score != 'None' and float(prev_score) > .5 and prev_char != char:
-                ff = [(prev_char, prev_line), (char, ' '.join(diag))]
-                idx += 1
-                # include any continuous dialogue from only these female characters
-                while idx < len(char_diag_list) and (char_diag_list[idx][0][0] == prev_char or char_diag_list[idx][0][0] == char):
-                    ff.append((char_diag_list[idx][0][0], ' '.join(char_diag_list[idx][1])))
-                    idx += 1
-                ffs.append(ff)
-            # either it wasn't a second female character so we're on the same line
-            # or it was a second female character and we went through their conversation
-            # and exited because it's not one of those characters anymore or idx == len
-            if idx < len(char_diag_list):
-                (char, gen, score), diag = char_diag_list[idx]
-                prev_char = char
-                prev_score = score
-                prev_line = ' '.join(diag)
-                idx += 1
-        return ffs
+
 
     def no_man_conversation(self, ff, male_chars):
         male_pronouns = ['he','him','his']
@@ -196,62 +179,40 @@ class T3RuleBased:
         return True
 
 
-class T2Classifier:
+class T3Classifier:
     def __init__(self, verbose = False):
         self.clf = LinearSVC()
-        self.rb = RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
 
     def transform(self, X):
-        feat_mat = np.zeros((len(X), 4), dtype=np.int)
-        for i,(path,char_dict) in enumerate(X):
-            feats = self.extract_features(path, char_dict)
-            feat_mat[i] = feats
-        return feat_mat
+        diag_per_movie = []  # diag per movie
+        print('Transforming', len(X), 'samples')
+        for i,(path,char_dict) in enumerate(X):  # for each movie
+            this_diag = ''
+            if i % 50 == 0: print(i)
+            if 'agarwal' in path:
+                source = 'agarwal'
+                scenes = get_boundaries_agarwal(path)
+            else:
+                source = 'gorinski'
+                scenes = get_boundaries_gorinski(path)
+            var2info = get_variant_as_key(char_dict)
+            for scene in scenes:  # for each scene
+                cdl = get_char_diag_list(scene, var2info, source)
+                for (char,gen,score),diag in cdl:  # for each character/line
+                    if score != 'None' and float(score) > .5:
+                        line = ' '.join(diag)
+                        if len(line) > 0:
+                            this_diag += ' ' + line
+            diag_per_movie.append(this_diag)
 
-    def extract_features(self, path, char_dict):
-        if self.verbose: print(path)
+        X = CountVectorizer(max_features=1000).fit_transform(diag_per_movie)
+        print(X.shape)
+        return X
 
-        if 'agarwal' in path:
-            source = 'agarwal'
-            scenes = get_boundaries_agarwal(path)
-        else:
-            source = 'gorinski'
-            scenes = get_boundaries_gorinski(path)
-
-        var2info = get_variant_as_key(char_dict)
-
-        feats = np.zeros(4, dtype=np.int)  # counts per rating
-        for scene in scenes:
-            gl = get_gender_list(scene, var2info, source)
-            rating = self.rate_scene(gl)
-            if rating > 0:
-                feats[rating-1] += 1
-
-        return feats
-
-    # rate scene for its potential contribution to T2
-    def rate_scene(self, gender_list):
-        check = self.rb.consecutive_in_scene(gender_list, 'hard')
-        if check == 1:
-            return 4
-        check = self.rb.consecutive_in_scene(gender_list, 'soft')
-        if check == 1:
-            return 3
-        check = self.rb.overlap_in_scene(gender_list, 'hard')
-        if check == 1:
-            return 2
-        check = self.rb.overlap_in_scene(gender_list, 'soft')
-        if check == 1:
-            return 1
-        return 0
-
-    def train(self, X, y, oversample = False):
+    def train(self, X, y):
         X = self.transform(X)
-        if oversample:
-            oversampler = SMOTE()
-            X, y = oversampler.fit_sample(X, y)
         self.clf.fit(X, y)
         self.trained = True
 
@@ -263,11 +224,18 @@ class T2Classifier:
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
+        print('Distribution:', Counter(y))
         X = self.transform(X)
         pred = cross_val_predict(self.clf, X, y, cv=n)
         return pred
 
-
 if __name__ == "__main__":
-    eval_rule_based(test='agarwal')
+    # eval_rule_based(test='all')
+
+    X,y = get_t3_data(source='combined')
+    print(Counter(y))
+    X = [(x[1], x[2]) for x in X]
+    clf = T2Classifier()
+    pred = clf.cross_val(X,y,n=5)
+    print(eval(pred, y, verbose=True))
 

@@ -71,6 +71,7 @@ def get_variant_as_key(char_dict):
             var2info[v] = (char, gen, score)
     return var2info
 
+
 if __name__ == "__main__":
     combined_data = get_data()
     check_distribution(combined_data)

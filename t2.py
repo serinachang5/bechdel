@@ -1,3 +1,4 @@
+from align_gender import get_char_diag_list, get_ff_conversations
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
 import numpy as np
@@ -16,8 +17,14 @@ from sklearn.tree import DecisionTreeClassifier
 def get_t2_data(source = 'combined'):
     data = get_data(source)
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # (id, path, char dict)
-    y = np.array([1 if int(x[1][3]) >= 2 else 0 for x in data], dtype=np.int)  # check if sample passes T1
+    X = []
+    y = []
+    for x in data:
+        rating = int(x[1][3])
+        if rating >= 1:  # only include those that passed 1
+            X.append((x[0], x[1][4], x[1][5]))  # (id, path, char dict)
+            label = 1 if rating >= 2 else 0  # check if sample passes T2
+            y.append(label)
     return X, y
 
 def split_and_save(X, y, train_prop = .6, val_prop = .2, test_prop = .2):
@@ -46,30 +53,6 @@ def split_and_save(X, y, train_prop = .6, val_prop = .2, test_prop = .2):
     pickle.dump([X_train, X_val, X_test, y_train, y_val, y_test], open('t2_split.p', 'wb'))
     print('Saved t2_split.p')
     return X_train, X_val, X_test, y_train, y_val, y_test
-
-def get_gender_list(scene, var2info, source):
-    char_gen_list = []
-
-    if source == 'agarwal':
-        for line in scene:
-            if line.startswith('C|'):
-                # process variant
-                var = line.split(None, 1)[1]  # cut off C| + white space
-                if var.startswith('('):  # probably a description e.g. '(QUIETLY)'
-                    continue
-                var = var.strip()  # strip trailing white space
-                if var in var2info:
-                    char_gen_list.append(var2info[var])  # char, gen, score
-
-    else:  # source == 'gorinski'
-        for line in scene:  # try all lines bc no marker of character
-            possible = line.strip() # strip leading and trailing white space
-            if possible.startswith('('): # probably a description e.g. '(QUIETLY)'
-                continue
-            if possible in var2info:
-                char_gen_list.append(var2info[possible])
-
-    return char_gen_list
 
 
 '''EVAL METHODS'''
@@ -164,15 +147,14 @@ class T2RuleBased:
         var2info = get_variant_as_key(char_dict)
 
         for scene in scenes:
-            gl = get_gender_list(scene, var2info, source)
-            if self.overlap_in_scene(gl, mode):
+            cdl = get_char_diag_list(scene, var2info, source)
+            if self.overlap_in_scene(cdl, mode):
                 return 1
-
         return 0
 
-    def overlap_in_scene(self, gender_list, mode):
+    def overlap_in_scene(self, cdl, mode):
         fem_chars = set()
-        for char, gen, score in gender_list:
+        for (char, gen, score),diag in cdl:
             if mode == 'hard' and gen == 'F':
                 fem_chars.add(char)
                 if len(fem_chars) == 2:
@@ -201,17 +183,17 @@ class T2RuleBased:
         var2info = get_variant_as_key(char_dict)
 
         for scene in scenes:
-            gl = get_gender_list(scene, var2info, source)
-            if self.consecutive_in_scene(gl, mode):
+            cdl = get_char_diag_list(scene, var2info, source)
+            if self.consecutive_in_scene(cdl, mode):
                 return 1
 
         return 0
 
-    def consecutive_in_scene(self, gender_list, mode):
+    def consecutive_in_scene(self, cdl, mode):
         prev_char = ''
         prev_gen = ''
         prev_score = -1
-        for char, gen, score in gender_list:
+        for (char, gen, score),diag in cdl:
             if mode == 'hard':
                 if gen == 'F' and prev_gen == 'F' and prev_char != char:
                     if self.verbose:
@@ -232,13 +214,13 @@ class T2RuleBased:
 
 class T2Classifier:
     def __init__(self, verbose = False):
-        self.clf = LinearSVC()
+        self.clf = LinearSVC(class_weight={0:.6, 1:.4})
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
 
     def transform(self, X):
-        feat_mat = np.zeros((len(X), 4), dtype=np.int)
+        feat_mat = np.zeros((len(X), 3), dtype=np.int)
         for i,(path,char_dict) in enumerate(X):
             feats = self.extract_features(path, char_dict)
             feat_mat[i] = feats
@@ -256,30 +238,27 @@ class T2Classifier:
 
         var2info = get_variant_as_key(char_dict)
 
-        feats = np.zeros(4, dtype=np.int)  # counts per rating
+        feats = np.zeros(3, dtype=np.int)  # counts per rating
         for scene in scenes:
-            gl = get_gender_list(scene, var2info, source)
-            rating = self.rate_scene(gl)
-            if rating > 0:
+            cdl = get_char_diag_list(scene, var2info, source)
+            rating = self.rate_scene(cdl)
+            if rating >= 1:
                 feats[rating-1] += 1
 
         return feats
 
     # rate scene for its potential contribution to T2
-    def rate_scene(self, gender_list):
-        check = self.rb.consecutive_in_scene(gender_list, 'hard')
+    def rate_scene(self, cdl):
+        ffs = get_ff_conversations(cdl)
+        if len(ffs) > 0:
+            for ff in ffs:
+                if len(ff) > 4:  # has long ff
+                    return 3
+            return 2  # has consecutive soft
+        check = self.rb.overlap_in_scene(cdl, 'soft')
         if check == 1:
-            return 4
-        check = self.rb.consecutive_in_scene(gender_list, 'soft')
-        if check == 1:
-            return 3
-        check = self.rb.overlap_in_scene(gender_list, 'hard')
-        if check == 1:
-            return 2
-        check = self.rb.overlap_in_scene(gender_list, 'soft')
-        if check == 1:
-            return 1
-        return 0
+            return 1  # has overlap soft
+        return 0  # failed
 
     def train(self, X, y, oversample = False):
         X = self.transform(X)
@@ -297,6 +276,7 @@ class T2Classifier:
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
+        print('Distribution:', Counter(y))
         X = self.transform(X)
         pred = cross_val_predict(self.clf, X, y, cv=n)
         return pred
@@ -306,12 +286,10 @@ if __name__ == "__main__":
     # X, y = get_t2_data()
     # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
 
-    # for test_type in ['all', 'test', 'agarwal']:
-        # print('\nEvaluating on', test_type.upper(), 'data...')
-        # eval_rule_based(test=test_type)
+    # for test_type in ['all', 'agarwal']:
+    #     print('\nEvaluating on', test_type.upper(), 'data...')
+    #     eval_rule_based(test=test_type)
 
-    # for test_type in ['all_cv', 'agarwal_cv', 'test']:
-        # print('\nEvaluating on', test_type.upper(), 'data...')
-        # eval_clf(test=test_type)
-
-    eval_rule_based(test='all')
+    for test_type in ['all_cv', 'agarwal_cv']:
+        print('\nEvaluating on', test_type.upper(), 'data...')
+        eval_clf(test=test_type)

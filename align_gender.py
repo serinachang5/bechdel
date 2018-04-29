@@ -136,7 +136,6 @@ def parse_agarwal_chars(file_path, prefixes):
                             root_to_info[root] = [None, {var}]
         return root_to_info
 
-
 def parse_gorinski_chars(file_path, prefixes):
     male_pre, fem_pre, neu_pre = prefixes
     with open(file_path, 'r') as f:
@@ -232,6 +231,86 @@ def write_to_file(row, root_to_info, save_dir):
                 f.write((offset * 2) + v + '\n')
 
     return found
+
+
+def get_char_diag_list(scene, var2info, source):
+    char_diag_list = []
+
+    if source == 'agarwal':
+        idx = 0
+        while idx < len(scene):
+            if scene[idx].startswith('C|'):
+                # process variant
+                var = scene[idx].split(None, 1)[1]  # cut off C| + white space
+                if var.startswith('('):  # probably a description e.g. '(QUIETLY)'
+                    idx += 1
+                    continue
+                var = var.strip()  # strip trailing white space
+                if var in var2info:
+                    curr_char = var2info[var]  # root, gen, score
+                    idx += 1
+                    diag = []
+                    while idx < len(scene) and scene[idx].startswith('D|'):
+                        line = scene[idx].split(None, 1)[1]  # cut off D| + white space
+                        line = line.strip()
+                        diag.append(line)
+                        idx += 1
+                    char_diag_list.append((curr_char, diag))
+                else:
+                    idx += 1
+            else:
+                idx += 1
+
+    else:  # source == 'gorinski'
+        idx = 0
+        while idx < len(scene):
+            possible = scene[idx].strip()
+            if possible.startswith('('):
+                idx += 1
+                continue
+            if possible in var2info:
+                curr_char = var2info[possible]
+                idx += 1
+                if idx < len(scene):
+                    diag = []
+                    diag_ls = len(scene[idx]) - len(scene[idx].lstrip(' '))
+                    while idx < len(scene) and diag_ls == len(scene[idx]) - len(scene[idx].lstrip(' ')):
+                        diag.append(scene[idx].strip())
+                        idx += 1
+                    char_diag_list.append((curr_char, diag))
+            else:
+                idx += 1
+
+    return char_diag_list
+
+def get_ff_conversations(char_diag_list):
+    ffs = []
+    prev_char = ''
+    prev_score = -1
+    prev_line = ''
+    idx = 0
+    while idx < len(char_diag_list):
+        (char, gen, score), diag = char_diag_list[idx]
+        if score != 'None' and float(score) > .5 and \
+                prev_score != 'None' and float(prev_score) > .5 and prev_char != char:
+            ff = [(prev_char, prev_line), (char, ' '.join(diag))]
+            idx += 1
+            # include any continuous dialogue from only these female characters
+            while idx < len(char_diag_list) and (char_diag_list[idx][0][0] == prev_char or char_diag_list[idx][0][0] == char):
+                ff.append((char_diag_list[idx][0][0], ' '.join(char_diag_list[idx][1])))
+                idx += 1
+            ffs.append(ff)
+        # either it wasn't a second female character so we're on the same line
+        # or it was a second female character and we went through their conversation
+        # and exited because it's not one of those characters anymore or idx == len
+        if idx < len(char_diag_list):
+            (char, gen, score), diag = char_diag_list[idx]
+            prev_char = char
+            prev_score = score
+            prev_line = ' '.join(diag)
+            idx += 1
+    return ffs
+
 
 if __name__ == "__main__":
     SOURCE = 'agarwal'

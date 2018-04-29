@@ -67,7 +67,7 @@ def eval_rule_based(test = 'all'):
         X, y = get_t1_data(source = 'agarwal')
     X = [x[1] for x in X]
 
-    rb = RuleBased()
+    rb = T1RuleBased()
 
     print('RULE-BASED: HARD')
     pred = rb.predict(X, mode='hard')
@@ -142,7 +142,7 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        self.clf = KNeighborsClassifier()
+        self.clf = KNeighborsClassifier(n_neighbors=5)
         self.trained = False
 
     def transform(self, X):
@@ -175,6 +175,7 @@ class T1Classifier:
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
+        print('Distribution:', Counter(y))
         X = self.transform(X)
         pred = cross_val_predict(self.clf, X, y, cv=n)
         return pred
@@ -188,6 +189,10 @@ if __name__ == "__main__":
     #     print('\nEvaluating on', test_type.upper(), 'data...')
     #     eval_rule_based(test=test_type)
 
-    for test_type in ['all_cv', 'agarwal_cv', 'test']:
-        print('\nEvaluating on', test_type.upper(), 'data...')
-        eval_clf(test=test_type)
+    # for test_type in ['all_cv', 'agarwal_cv', 'test']:
+    #     print('\nEvaluating on', test_type.upper(), 'data...')
+    #     eval_clf(test=test_type)
+    X,y = get_t1_data(source='combined')
+    X = [x[1] for x in X]
+    pred = T1Classifier().cross_val(X, y)
+    print(eval(y, pred, verbose=True))
