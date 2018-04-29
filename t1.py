@@ -108,7 +108,7 @@ def eval_clf(test = 'all_cv'):
         print(eval(y_test, pred, verbose=True))
 
 
-class RuleBased:
+class T1RuleBased:
     def predict(self, X, mode = 'hard'):
         assert(mode == 'hard' or mode == 'soft')
         if mode == 'hard':
@@ -142,7 +142,7 @@ class RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        self.clf = RandomForestClassifier()
+        self.clf = KNeighborsClassifier()
         self.trained = False
 
     def transform(self, X):

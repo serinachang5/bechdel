@@ -93,7 +93,7 @@ def eval_rule_based(test = 'all'):
         X, y = get_t2_data(source = 'agarwal')
     X = [(x[1], x[2]) for x in X]
 
-    rb = RuleBased()
+    rb = T2RuleBased()
 
     print('RULE-BASED: OVERLAP, HARD')
     pred = rb.predict(X, interact='overlap', mode='hard')
@@ -136,7 +136,7 @@ def eval_clf(test = 'all_cv'):
         print(eval(y_test, pred, verbose=True))
 
 
-class RuleBased:
+class T2RuleBased:
     def __init__(self, verbose = False):
         self.verbose = verbose
 
@@ -232,8 +232,8 @@ class RuleBased:
 
 class T2Classifier:
     def __init__(self, verbose = False):
-        self.clf = RandomForestClassifier()
-        self.rb = RuleBased(verbose=verbose)
+        self.clf = LinearSVC()
+        self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
 
@@ -310,6 +310,8 @@ if __name__ == "__main__":
         # print('\nEvaluating on', test_type.upper(), 'data...')
         # eval_rule_based(test=test_type)
 
-    for test_type in ['all_cv', 'agarwal_cv', 'test']:
-        print('\nEvaluating on', test_type.upper(), 'data...')
-        eval_clf(test=test_type)
+    # for test_type in ['all_cv', 'agarwal_cv', 'test']:
+        # print('\nEvaluating on', test_type.upper(), 'data...')
+        # eval_clf(test=test_type)
+
+    eval_rule_based(test='all')
