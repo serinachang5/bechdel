@@ -1,3 +1,14 @@
+# get_scene_boundaries returns individual scenes
+# for screenplays and writes them to their 
+# respective directories based on the movie name
+# for both agarwal and gorinski screenplays
+
+# call get_boundaries_agarwal to divide scenes
+# in agarwal movies
+
+# call get_boundaries_gorinski to divide scenes
+# in gorinski movies
+
 import csv
 import os
 
@@ -72,27 +83,27 @@ def get_boundaries_gorinski(filepath):
 
 if __name__ == "__main__":
 
-	# agarwal = csv.DictReader(open("data/agarwal_alignments_with_IDs_with_bechdel.csv"))
-	gorinski = csv.DictReader(open("data/gorinski_alignments_with_IDs_with_bechdel.csv"))
+	agarwal = csv.DictReader(open("data/agarwal_alignments_with_IDs_with_bechdel.csv"))
+	#gorinski = csv.DictReader(open("data/gorinski_alignments_with_IDs_with_bechdel.csv"))
 
-	# all_movies = getAll(agarwal)
-	all_movies = getAll(gorinski)
+	all_movies = getAll(agarwal)
+	#all_movies = getAll(gorinski)
 
 	for item in all_movies:
-		# original_name = item[2][:-4]  agarwal
-		original_name = item[2][:-16] # gorinksi
+		original_name = item[2][:-4]  # file title for agarwal movies
+		# original_name = item[2][:-16] # file title for gorinski movies
 		if not os.path.exists(original_name+item[0]+"_scenes"):
 			os.makedirs(original_name+item[0]+"_scenes")
 
 		count = 1
-		scenes = get_boundaries_gorinski(item[2])
+		scenes = get_boundaries_agarwal(item[2])
 		for s in scenes:
 			output_file = open(original_name+item[0]+"_scenes/"+str(count)+".txt", 'w')
 			count +=1
-			output_file.writelines(["%s\n" % item for item in s])
+			output_file.writelines(["%s" % item for item in s])
 
-	g_scenes = open("data/gorinski_files_with_scenes.txt", "w")
-	g_scenes.writelines(["%s\n" % item  for item in list(sc_files)])
+	#g_scenes = open("data/gorinski_files_with_scenes.txt", "w")
+	#g_scenes.writelines(["%s\n" % item  for item in list(sc_files)])
 
 
 
