@@ -162,7 +162,7 @@ class T3Classifier:
                                 this_diag += ' ' + line
             diag_per_movie.append(this_diag)
 
-        X = CountVectorizer(max_features=1000).fit_transform(diag_per_movie)
+        X = CountVectorizer(max_features=500).fit_transform(diag_per_movie)
         print(X.shape)
         return X
 
@@ -185,11 +185,11 @@ class T3Classifier:
         return pred
 
 if __name__ == "__main__":
-    # eval_rule_based(test='all')
+    eval_rule_based(test='agarwal')
 
-    X,y = get_t3_data(source='combined')
-    X = [(x[1], x[2]) for x in X]
-    clf = T3Classifier(only_ff=False)
-    pred = clf.cross_val(X,y,n=5)
-    print(eval(pred, y, verbose=True))
+    # X,y = get_t3_data(source='combined')
+    # X = [(x[1], x[2]) for x in X]
+    # clf = T3Classifier(only_ff=True)
+    # pred = clf.cross_val(X,y,n=5)
+    # print(eval(pred, y, verbose=True))
 

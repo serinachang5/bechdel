@@ -1,8 +1,8 @@
-import pickle
 import csv
-import json
 import imdb
+import json
 import os
+import pickle
 import string
 
 DEBUGGING = False
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     # dictionary = pickle.load(open('gorinski_alignments.p', 'rb'))
     # write_to_csv(dictionary, 'gorinski_alignments.csv')
 
-    SOURCE = 'agarwal'
+    SOURCE = 'gorinski'
 
     bech_dict, id_len = parse_bechdel()
     print('Bechdel scores:', len(bech_dict))

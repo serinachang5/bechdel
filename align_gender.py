@@ -56,90 +56,95 @@ def line_to_variant(line, source):
         var = line.strip()
     return var
 
-# transform variant into root and return gender score if prefix found
+# transform variant into root
 def variant_to_root(var):
-    MALE_PREFIX = ['mr', 'mister', 'duke', 'father', 'brother', 'monsieur', 'prince', 'sir']
-    FEMALE_PREFIX = ['ms', 'miss', 'mrs', 'duchess', 'mother', 'sister', 'mademoiselle', 'mlle',
-                     'madame', 'princess']
-    NEU_PREFIX = ['dr', 'doctor', 'gen', 'general', 'gov', 'governor', 'judge', 'lord', 'major',
-                  'master', 'president', 'professor', 'prof', 'senator']
-    # https://mediawiki.middlebury.edu/wiki/LIS/Name_Standards
+    var = var.lower()
 
-    root = None
-    gen_score = None
-    toks = var.lower().split()
-    # if len(toks) > 0:
-        # if toks[0].strip('\'\".-:') == 'the': # remove leading 'the'
-            # toks.pop(0)
-    if len(toks) > 0:
-        first = toks[0].strip('\'\".-:')
-        if first in MALE_PREFIX:
-            if len(toks) > 1 and not toks[1].startswith('('):
-                root = first + ' ' + toks[1].strip('\'\".-:')
-            else:
-                root = first
-            gen_score = 0.0
-        elif first in FEMALE_PREFIX:
-            if len(toks) > 1 and not toks[1].startswith('('):
-                root = first + ' ' + toks[1].strip('\'\".-:')
-            else:
-                root = first
-            gen_score = 1.0
-        elif first in NEU_PREFIX:
-            if len(toks) > 1 and not toks[1].startswith('('):
-                root = first + ' ' + toks[1].strip('\'\".-:')
-            else:
-                root = first
+    # if 'voice' in variant and there's a possessive,
+    # keep whatever is before the posessive
+    if 'voice' in var:
+        if '\'s' in var:
+            var = var.split('\'s', 1)[0]
+        elif 's\'' in var:
+            var = var.split('s\'', 1)[0] + 's'
+
+    # clean each token
+    toks = [tok.strip(',.-:') for tok in var.split()]
+
+    # remove '', anything in parentheses, and 'the'
+    to_keep = []
+    for tok in toks:
+        if len(tok) == 0 or tok.startswith('(') or tok.endswith(')') or tok == 'the':
+            pass
         else:
-            root = first
-    return root, gen_score
+            to_keep.append(tok)
+
+    return ' '.join(to_keep)
 
 # return dict: root -> [gen_score, variants]
 def classify_chars(screenplay_fname, movie_year, ssa_dict, source):
+    assert(source == 'agarwal' or source == 'gorinski')
+
+    MALE_PREFIX = ['mr', 'mister', 'duke', 'father', 'brother', 'monsieur', 'prince', 'sir']
+    FEMALE_PREFIX = ['ms', 'miss', 'mrs', 'duchess', 'mother', 'sister', 'mademoiselle', 'mlle',
+                     'madame', 'princess']
+    # https://mediawiki.middlebury.edu/wiki/LIS/Name_Standards
+
     decade_start = movie_year - 9
     ssa_name_scores = []
     for year in range(decade_start, movie_year+1):
         if year in ssa_dict:
             ssa_name_scores.append(ssa_dict[year])
 
-    root_to_info = None
     if source == 'agarwal':
-        root_to_info = parse_agarwal_chars(screenplay_fname)
-    elif source == 'gorinski':
-        root_to_info = parse_gorinski_chars(screenplay_fname)
+        root_to_vars = parse_agarwal_chars(screenplay_fname)
+    else:
+        root_to_vars = parse_gorinski_chars(screenplay_fname)
 
-    for root,(gen, vars) in root_to_info.items():
-        if gen is None:
+    root_to_info = {}
+    for root,vars in root_to_vars.items():
+        toks = root.split()
+        if len(toks) == 0: print(root,vars)
+        first = toks[0]
+        gen_score = None
+        if first in MALE_PREFIX:
+            gen_score = 0.0
+        elif first in FEMALE_PREFIX:
+            gen_score = 1.0
+
+        # try finding gender in each token
+        i = 0
+        while i < len(toks) and gen_score is None:
+            name = toks[i]
             sum_score = 0
             year_count = 0
             for year_scores in ssa_name_scores:
-                if root in year_scores:
-                    score = year_scores[root]
+                if name in year_scores:
+                    score = year_scores[name]
                     sum_score += score
                     year_count += 1
             if year_count > 0:
-                root_to_info[root][0] = sum_score/year_count
+                gen_score = sum_score/year_count
+            i += 1
+        root_to_info[root] = [gen_score, vars]
 
     return root_to_info
 
-# return dict: root -> gender, variants
+# return dict: root -> variants
 def parse_agarwal_chars(file_path):
     with open(file_path, 'r') as f:
-        root_to_info = {} # root mapped to gender score and variants
+        root_to_vars = {}  # root mapped to set of variants
         for line in f.readlines():
             if line.startswith('C|'):
                 var = line_to_variant(line, source='agarwal')
-                if var.startswith('('): # probably a description e.g. '(QUIETLY)'
+                if var.startswith('('):  # probably a description e.g. '(QUIETLY)'
                     continue
-
-                root, gen_score = variant_to_root(var)
-                if root not in root_to_info:
-                    root_to_info[root] = [None, set()]
-                if gen_score is not None:
-                    root_to_info[root][0] = gen_score
-                root_to_info[root][1].add(var)
-
-    return root_to_info
+                root = variant_to_root(var)
+                if len(root) > 0:
+                    if root not in root_to_vars:
+                        root_to_vars[root] = set()
+                    root_to_vars[root].add(var)
+    return root_to_vars
 
 # return dict: root -> gender, variants
 def parse_gorinski_chars(file_path):
@@ -150,22 +155,20 @@ def parse_gorinski_chars(file_path):
             leading_space = len(line) - len(line.lstrip(' '))
             max_ls = max(leading_space, max_ls)
 
-        root_to_info = {} # root mapped to gender score and variants
+        root_to_vars = {} # root mapped to set of variants
         for line in lines:
             leading_space = len(line) - len(line.lstrip(' '))
             if leading_space >= max_ls:
                 var = line_to_variant(line, source='gorinski')
                 if var.startswith('('): # probably a description e.g. '(QUIETLY)'
                     continue
+                root = variant_to_root(var)
+                if len(root) > 0:
+                    if root not in root_to_vars:
+                        root_to_vars[root] = set()
+                    root_to_vars[root].add(var)
 
-                root, gen_score = variant_to_root(var)
-                if root not in root_to_info:
-                    root_to_info[root] = [None, set()]
-                if gen_score is not None:
-                    root_to_info[root][0] = gen_score
-                root_to_info[root][1].add(var)
-
-    return root_to_info
+    return root_to_vars
 
 # write char_dict and other metadata to file
 def write_to_file(row, root_to_info, save_dir):
@@ -333,7 +336,7 @@ def test_funcs_on_agarwal():
     # print(var_dict)
 
     # 3. parse scene
-    for sc in scenes[:1]:
+    for sc in scenes[15:16]:
         print('SCENE')
         print(sc)
         cdl = get_char_diag_list(sc, var_dict, source='agarwal')
@@ -345,8 +348,10 @@ def test_funcs_on_agarwal():
         for ff in ffs:
             print(ff)
 
+
+
 if __name__ == "__main__":
-    # SOURCE = 'agarwal'
+    # SOURCE = 'gorinski'
     #
     # ssa_dict = pickle.load(open('parsed_ssa.p', 'rb'))
     # print('Number of years in SSA parsed:', len(ssa_dict))

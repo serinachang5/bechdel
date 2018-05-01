@@ -186,14 +186,14 @@ if __name__ == "__main__":
     # X, y = get_t1_data()
     # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
 
-    # for test_type in ['all', 'test', 'agarwal']:
-    #     print('\nEvaluating on', test_type.upper(), 'data...')
-    #     eval_rule_based(test=test_type)
+    # for test_type in ['all', 'agarwal']:
+        # print('\nEvaluating on', test_type.upper(), 'data...')
+        # eval_rule_based(test=test_type)
 
-    # for test_type in ['all_cv', 'agarwal_cv', 'test']:
-    #     print('\nEvaluating on', test_type.upper(), 'data...')
-    #     eval_clf(test=test_type)
-    X,y = get_t1_data(source='combined')
-    X = [x[1] for x in X]
-    pred = T1Classifier().cross_val(X, y)
-    print(eval(y, pred, verbose=True))
+    for test_type in ['all_cv', 'agarwal_cv']:
+        print('\nEvaluating on', test_type.upper(), 'data...')
+        eval_clf(test=test_type)
+    # X,y = get_t1_data(source='combined')
+    # X = [x[1] for x in X]
+    # pred = T1Classifier().cross_val(X, y)
+    # print(eval(y, pred, verbose=True))

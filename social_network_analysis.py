@@ -1,7 +1,7 @@
-from align_gender import get_char_diag_list, get_ff_conversations
+import align_gender as ag
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
 from t3 import get_t3_data
-from util import get_data, check_distribution, get_variant_as_key
+from util import get_data, check_distribution
 
 
 VERBOSE = True
@@ -52,12 +52,12 @@ def get_social_network(path, char_dict):
         source = 'gorinski'
         scenes = get_boundaries_gorinski(path)
 
-    var2info = get_variant_as_key(char_dict)
+    var2info = ag.get_variant_as_key(char_dict)
 
     net = Network()
     for i,scene in enumerate(scenes):
         if VERBOSE: print('Scene', i)
-        cdl = get_char_diag_list(scene, var2info, source)
+        cdl = ag.get_char_diag_list(scene, var2info, source)
         char_tuples = set([cd[0] for cd in cdl])
         char_tuples = sorted(list(char_tuples), key=lambda x:x[0])  # sort by name
         if VERBOSE: print('Char names:', [x[0] for x in char_tuples])  # print char names

@@ -1,6 +1,7 @@
-from align_gender import parse_by_gender_file
+import align_gender as ag
 import os
 import numpy as np
+import random
 
 def get_data(source = 'combined'):
     path = './movie_by_gender/'
@@ -8,7 +9,7 @@ def get_data(source = 'combined'):
     if source == 'agarwal' or source == 'gorinski':
         id_to_info = {}
         for fname in os.listdir(path + source + '/'):
-            id, info = parse_by_gender_file(path + source + '/' + fname)
+            id, info = ag.parse_by_gender_file(path + source + '/' + fname)
             id_to_info[id] = info
         return id_to_info
 
@@ -37,7 +38,20 @@ def check_distribution(data, test = None):
             counts[label] += 1
     return counts
 
+def error_analysis_of_char_names():
+    data = get_data()
+    data = list(data.values())
+    for i,info in enumerate(random.sample(data, 10)):
+        print('Sample',i)
+        char_dict = info[5]
+        var_dict = ag.get_variant_as_key(char_dict)
+        for var in var_dict:
+            if len(var.split()) > 1:  # more than one word
+                if '\'S' in var:
+                    print(var)
+
 
 if __name__ == "__main__":
-    combined_data = get_data()
-    print(check_distribution(combined_data))
+    # combined_data = get_data()
+    # print(check_distribution(combined_data))
+    error_analysis_of_char_names()
