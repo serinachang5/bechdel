@@ -1,18 +1,20 @@
+import align_gender as ag
+from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
+from t2 import T2RuleBased, T2Classifier
+from util import get_data, check_distribution
+
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
 import numpy as np
 import pickle
-from project.src.util import get_data, check_distribution, get_variant_as_key
-from project.src.get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
-from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.model_selection import cross_val_predict
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from t2 import T2RuleBased, T2Classifier
 
 '''PREPARE DATA'''
 def get_t3_data(source = 'combined'):
@@ -27,58 +29,6 @@ def get_t3_data(source = 'combined'):
             label = 1 if rating == 3 else 0  # check if sample passes T3
             y.append(label)
     return X, y
-
-
-def get_char_diag_list(scene, var2info, source):
-    char_diag_list = []
-
-    if source == 'agarwal':
-        idx = 0
-        while idx < len(scene):
-            if scene[idx].startswith('C|'):
-                # process variant
-                var = scene[idx].split(None, 1)[1]  # cut off C| + white space
-                if var.startswith('('):  # probably a description e.g. '(QUIETLY)'
-                    idx += 1
-                    continue
-                var = var.strip()  # strip trailing white space
-                if var in var2info:
-                    curr_char = var2info[var]  # root, gen, score
-                    idx += 1
-                    diag = []
-                    while idx < len(scene) and scene[idx].startswith('D|'):
-                        line = scene[idx].split(None, 1)[1]  # cut off D| + white space
-                        line = line.strip()
-                        diag.append(line)
-                        idx += 1
-                    char_diag_list.append((curr_char, diag))
-                else:
-                    idx += 1
-            else:
-                idx += 1
-
-    else:  # source == 'gorinski'
-        idx = 0
-        while idx < len(scene):
-            possible = scene[idx].strip()
-            if possible.startswith('('):
-                idx += 1
-                continue
-            if possible in var2info:
-                curr_char = var2info[possible]
-                idx += 1
-                if idx < len(scene):
-                    diag = []
-                    diag_ls = len(scene[idx]) - len(scene[idx].lstrip(' '))
-                    while idx < len(scene) and diag_ls == len(scene[idx]) - len(scene[idx].lstrip(' ')):
-                        diag.append(scene[idx].strip())
-                        idx += 1
-                    char_diag_list.append((curr_char, diag))
-            else:
-                idx += 1
-
-    return char_diag_list
-
 
 '''EVAL METHODS'''
 def eval(true, pred, verbose = False):
@@ -146,11 +96,11 @@ class T3RuleBased:
             scenes = get_boundaries_gorinski(path)
 
         male_chars = self.get_male_chars(char_dict)  # soft mode
-        var2info = get_variant_as_key(char_dict)
+        var2info = ag.get_variant_as_key(char_dict)
 
         for scene in scenes:
-            cdl = get_char_diag_list(scene, var2info, source)
-            ffs = self.get_ff_conversations(cdl)
+            cdl = ag.get_char_diag_list(scene, var2info, source)
+            ffs = ag.get_ff_conversations(cdl)
             # len(ffs) > 0 means it passes consecutive soft
             for ff in ffs:
                 if self.no_man_conversation(ff, male_chars):
@@ -163,8 +113,6 @@ class T3RuleBased:
             if score != 'None' and float(score) < .5:
                 male_chars.add(char)
         return male_chars
-
-
 
     def no_man_conversation(self, ff, male_chars):
         male_pronouns = ['he','him','his']
@@ -180,9 +128,10 @@ class T3RuleBased:
 
 
 class T3Classifier:
-    def __init__(self, verbose = False):
+    def __init__(self, only_ff = True, verbose = False):
         self.clf = LinearSVC()
         self.trained = False
+        self.only_ff = only_ff
         self.verbose = verbose
 
     def transform(self, X):
@@ -197,14 +146,20 @@ class T3Classifier:
             else:
                 source = 'gorinski'
                 scenes = get_boundaries_gorinski(path)
-            var2info = get_variant_as_key(char_dict)
+            var2info = ag.get_variant_as_key(char_dict)
             for scene in scenes:  # for each scene
-                cdl = get_char_diag_list(scene, var2info, source)
-                for (char,gen,score),diag in cdl:  # for each character/line
-                    if score != 'None' and float(score) > .5:
-                        line = ' '.join(diag)
-                        if len(line) > 0:
-                            this_diag += ' ' + line
+                cdl = ag.get_char_diag_list(scene, var2info, source)
+                if self.only_ff:
+                    ffs = ag.get_ff_conversations(cdl)
+                    for ff in ffs:
+                        for char,line in ff:
+                            this_diag += line
+                else:
+                    for (char,gen,score),diag in cdl:  # for each character/line
+                        if score != 'None' and float(score) > .5:
+                            line = ' '.join(diag)
+                            if len(line) > 0:
+                                this_diag += ' ' + line
             diag_per_movie.append(this_diag)
 
         X = CountVectorizer(max_features=1000).fit_transform(diag_per_movie)
@@ -233,9 +188,8 @@ if __name__ == "__main__":
     # eval_rule_based(test='all')
 
     X,y = get_t3_data(source='combined')
-    print(Counter(y))
     X = [(x[1], x[2]) for x in X]
-    clf = T2Classifier()
+    clf = T3Classifier(only_ff=False)
     pred = clf.cross_val(X,y,n=5)
     print(eval(pred, y, verbose=True))
 

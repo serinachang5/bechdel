@@ -1,11 +1,12 @@
+from util import get_data, check_distribution
+
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
 import numpy as np
 import pickle
-from project.src.util import get_data, check_distribution
-from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.model_selection import cross_val_predict
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC

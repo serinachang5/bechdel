@@ -1,4 +1,5 @@
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
+
 from csv import DictReader
 import os
 import pickle

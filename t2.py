@@ -1,17 +1,19 @@
-from align_gender import get_char_diag_list, get_ff_conversations
+import align_gender as ag
+from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
+from util import get_data, check_distribution
+
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
 import numpy as np
 import pickle
-from project.src.util import get_data, check_distribution, get_variant_as_key
-from project.src.get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
-from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.model_selection import cross_val_predict
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
+
 
 '''PREPARE DATA'''
 def get_t2_data(source = 'combined'):
@@ -144,10 +146,10 @@ class T2RuleBased:
             source = 'gorinski'
             scenes = get_boundaries_gorinski(path)
 
-        var2info = get_variant_as_key(char_dict)
+        var2info = ag.get_variant_as_key(char_dict)
 
         for scene in scenes:
-            cdl = get_char_diag_list(scene, var2info, source)
+            cdl = ag.get_char_diag_list(scene, var2info, source)
             if self.overlap_in_scene(cdl, mode):
                 return 1
         return 0
@@ -180,10 +182,10 @@ class T2RuleBased:
             source = 'gorinski'
             scenes = get_boundaries_gorinski(path)
 
-        var2info = get_variant_as_key(char_dict)
+        var2info = ag.get_variant_as_key(char_dict)
 
         for scene in scenes:
-            cdl = get_char_diag_list(scene, var2info, source)
+            cdl = ag.get_char_diag_list(scene, var2info, source)
             if self.consecutive_in_scene(cdl, mode):
                 return 1
 
@@ -236,11 +238,11 @@ class T2Classifier:
             source = 'gorinski'
             scenes = get_boundaries_gorinski(path)
 
-        var2info = get_variant_as_key(char_dict)
+        var2info = ag.get_variant_as_key(char_dict)
 
         feats = np.zeros(3, dtype=np.int)  # counts per rating
         for scene in scenes:
-            cdl = get_char_diag_list(scene, var2info, source)
+            cdl = ag.get_char_diag_list(scene, var2info, source)
             rating = self.rate_scene(cdl)
             if rating >= 1:
                 feats[rating-1] += 1
@@ -249,7 +251,7 @@ class T2Classifier:
 
     # rate scene for its potential contribution to T2
     def rate_scene(self, cdl):
-        ffs = get_ff_conversations(cdl)
+        ffs = ag.get_ff_conversations(cdl)
         if len(ffs) > 0:
             for ff in ffs:
                 if len(ff) > 4:  # has long ff
@@ -286,9 +288,9 @@ if __name__ == "__main__":
     # X, y = get_t2_data()
     # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
 
-    # for test_type in ['all', 'agarwal']:
-    #     print('\nEvaluating on', test_type.upper(), 'data...')
-    #     eval_rule_based(test=test_type)
+    for test_type in ['all', 'agarwal']:
+        print('\nEvaluating on', test_type.upper(), 'data...')
+        eval_rule_based(test=test_type)
 
     for test_type in ['all_cv', 'agarwal_cv']:
         print('\nEvaluating on', test_type.upper(), 'data...')
