@@ -84,13 +84,13 @@ def create_scene_directories(source):
 
 		for item in all_movies:
 			original_name = item[2][:-4]
-			if not os.path.exists(original_name+"_scenes"):
-				os.makedirs(original_name+"_scenes")
+			if not os.path.exists(original_name+"_"+item[0]+"_scenes"):
+				os.makedirs(original_name+"_"+item[0]+"_scenes")
 
 			count = 1
 			scenes = get_boundaries_gorinski(item[2])
 			for s in scenes:
-				output_file = open(original_name+"_scenes/"+str(count)+".txt", 'w')
+				output_file = open(original_name+"_"+item[0]+"_scenes/"+str(count)+".txt", 'w')
 				count +=1
 				output_file.writelines(["%s" % item for item in s])
 
@@ -102,19 +102,19 @@ def create_scene_directories(source):
 		for item in all_movies:
 			original_name = item[2][:-16] 
 			sp = original_name.split("/")
-			if not os.path.exists(original_name+sp[-2]+"_scenes"):
-				os.makedirs(original_name+sp[-2]+"_scenes")
+			if not os.path.exists(original_name+item[0]+"_scenes"):
+				os.makedirs(original_name+item[0]+"_scenes")
 
 			count = 1
 			scenes = get_boundaries_gorinski(item[2])
 			for s in scenes:
-				output_file = open(original_name+sp[-2]+"_scenes/"+str(count)+".txt", 'w')
+				output_file = open(original_name+item[0]+"_scenes/"+str(count)+".txt", 'w')
 				count +=1
 				output_file.writelines(["%s" % item for item in s])
 
 if __name__ == "__main__":
 
-	# create_scene_directories("agarwal")
-	# create_scene_directories("gorinski")
+	create_scene_directories("agarwal")
+	create_scene_directories("gorinski")
 
 	
