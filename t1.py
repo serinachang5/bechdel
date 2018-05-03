@@ -1,4 +1,7 @@
-from util import get_data, check_distribution
+from util import get_data, check_distribution, get_char_to_lines
+import align_gender as ag
+from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
+
 
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
@@ -16,7 +19,7 @@ from sklearn.tree import DecisionTreeClassifier
 def get_t1_data(source = 'combined'):
     data = get_data(source)
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = np.array([(x[0], x[1][5]) for x in data])  # (id, char dict)
+    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # (id, path, char dict)
     y = np.array([1 if int(x[1][3]) >= 1 else 0 for x in data], dtype=np.int)  # check if sample passes T1
     return X, y
 
@@ -66,7 +69,7 @@ def eval_rule_based(test = 'all'):
         _, _, X, _, _, y = pickle.load(open('t1_split.p', 'rb'))
     else:
         X, y = get_t1_data(source = 'agarwal')
-    X = [x[1] for x in X]
+    X = [(x[1], x[2]) for x in X]
 
     rb = T1RuleBased()
 
@@ -83,19 +86,19 @@ def eval_clf(test = 'all_cv'):
     clf = T1Classifier()
     if test == 'all_cv':
         X, y = get_t1_data()
-        X = [x[1] for x in X]
+        X = [(x[1], x[2]) for x in X]
         pred = clf.cross_val(X, y)
         print(eval(y, pred, verbose=True))
     elif test == 'agarwal_cv':
         X, y = get_t1_data(source='agarwal')
-        X = [x[1] for x in X]
+        X = [(x[1], x[2]) for x in X]
         pred = clf.cross_val(X, y)
         print(eval(y, pred, verbose=True))
     else:  # test on test set
         X_train, X_val, X_test, y_train, y_val, y_test = pickle.load(open('t1_split.p', 'rb'))
         X_train = np.concatenate((X_train, X_val))
-        X_train = [x[1] for x in X_train]
-        X_test = [x[1] for x in X_test]
+        X_train = [(x[1], x[2]) for x in X_train]
+        X_test = [(x[1], x[2]) for x in X_test]
         y_train = np.concatenate((y_train, y_val))
 
         print('WITHOUT OVERSAMPLING')
@@ -114,12 +117,12 @@ class T1RuleBased:
         assert(mode == 'hard' or mode == 'soft')
         if mode == 'hard':
             pred = []
-            for x in X:
-                pred.append(self.predict_hard(x))
+            for path, char_dict in X:
+                pred.append(self.predict_hard(char_dict))
         else:
             pred = []
-            for x in X:
-                pred.append(self.predict_soft(x))
+            for path, char_dict in X:
+                pred.append(self.predict_soft(char_dict))
         return np.array(pred)
 
     def predict_hard(self, char_dict):
@@ -143,22 +146,32 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        self.clf = KNeighborsClassifier(n_neighbors=5)
+        self.clf = DecisionTreeClassifier()
+        # best - self.clf = LinearSVC(class_weight={0: .9, 1: .1})
         self.trained = False
 
     def transform(self, X):
-        feat_mat = np.zeros((len(X), 6), dtype=np.int)
-        for i,char_dict in enumerate(X):
-            feats = np.zeros(6, dtype=np.int)
-            for root, (gen, score, variants) in char_dict.items():
-                if score != 'None':
-                    score = float(score)
-                    if score >= .5:
-                        bucket = int(score/.1) - 5
-                        feats[bucket] += 1
+        feat_mat = np.zeros((len(X), 2), dtype=np.int)
+        for i,(path,char_dict) in enumerate(X):
+            feats = self.extract_features(path, char_dict)
             feat_mat[i] = feats
-
         return feat_mat
+
+    def extract_features(self, path, char_dict):
+        char_to_lines = get_char_to_lines(path=path, char_dict=char_dict)
+
+        # num of fems with > 1 lines, num of fems with 1 line
+        feats = np.zeros(2, dtype=np.int)
+
+        for char, lines in char_to_lines.items():
+            gen, score, var = char_dict[char]
+            if score != 'None' and float(score) > .5:
+                if len(lines) > 1:
+                    feats[0] += 1
+                else:
+                    feats[1] += 1
+
+        return feats
 
     def train(self, X, y, oversample = True):
         X = self.transform(X)
@@ -193,6 +206,7 @@ if __name__ == "__main__":
     for test_type in ['all_cv', 'agarwal_cv']:
         print('\nEvaluating on', test_type.upper(), 'data...')
         eval_clf(test=test_type)
+
     # X,y = get_t1_data(source='combined')
     # X = [x[1] for x in X]
     # pred = T1Classifier().cross_val(X, y)

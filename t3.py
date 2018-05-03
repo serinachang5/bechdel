@@ -147,7 +147,8 @@ class T3Classifier:
                 source = 'gorinski'
                 scenes = get_boundaries_gorinski(path)
             var2info = ag.get_variant_as_key(char_dict)
-            for scene in scenes:  # for each scene
+
+            for scene in scenes:
                 cdl = ag.get_char_diag_list(scene, var2info, source)
                 if self.only_ff:
                     ffs = ag.get_ff_conversations(cdl)
@@ -162,7 +163,7 @@ class T3Classifier:
                                 this_diag += ' ' + line
             diag_per_movie.append(this_diag)
 
-        X = CountVectorizer(max_features=500).fit_transform(diag_per_movie)
+        X = CountVectorizer(max_features=300).fit_transform(diag_per_movie)
         print(X.shape)
         return X
 
@@ -185,11 +186,11 @@ class T3Classifier:
         return pred
 
 if __name__ == "__main__":
-    eval_rule_based(test='agarwal')
+    # eval_rule_based(test='all')
 
-    # X,y = get_t3_data(source='combined')
-    # X = [(x[1], x[2]) for x in X]
-    # clf = T3Classifier(only_ff=True)
-    # pred = clf.cross_val(X,y,n=5)
-    # print(eval(pred, y, verbose=True))
+    X,y = get_t3_data(source='agarwal')
+    X = [(x[1], x[2]) for x in X]
+    clf = T3Classifier(only_ff=False)
+    pred = clf.cross_val(X,y,n=5)
+    print(eval(pred, y, verbose=True))
 

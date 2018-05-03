@@ -216,7 +216,8 @@ class T2RuleBased:
 
 class T2Classifier:
     def __init__(self, verbose = False):
-        self.clf = LinearSVC(class_weight={0:.6, 1:.4})
+        self.clf = DecisionTreeClassifier()
+        # best - self.clf = LinearSVC(class_weight={0:.58, 1:.42})
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
@@ -288,9 +289,9 @@ if __name__ == "__main__":
     # X, y = get_t2_data()
     # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
 
-    for test_type in ['all', 'agarwal']:
-        print('\nEvaluating on', test_type.upper(), 'data...')
-        eval_rule_based(test=test_type)
+    # for test_type in ['all', 'agarwal']:
+    #     print('\nEvaluating on', test_type.upper(), 'data...')
+    #     eval_rule_based(test=test_type)
 
     for test_type in ['all_cv', 'agarwal_cv']:
         print('\nEvaluating on', test_type.upper(), 'data...')

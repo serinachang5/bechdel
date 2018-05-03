@@ -2,6 +2,7 @@ import align_gender as ag
 import os
 import numpy as np
 import random
+from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
 
 def get_data(source = 'combined'):
     path = './movie_by_gender/'
@@ -38,6 +39,29 @@ def check_distribution(data, test = None):
             counts[label] += 1
     return counts
 
+# get char mapped to all their lines
+def get_char_to_lines(path, char_dict):
+    if 'agarwal' in path:
+        source = 'agarwal'
+        scenes = get_boundaries_agarwal(path)
+    else:
+        source = 'gorinski'
+        scenes = get_boundaries_gorinski(path)
+
+    var2info = ag.get_variant_as_key(char_dict)
+
+    char_to_lines = {}
+    for scene in scenes:
+        cdl = ag.get_char_diag_list(scene, var2info, source)
+        for (root, gen, score), diag in cdl:
+            if root in char_to_lines:
+                char_to_lines[root].append(' '.join(diag))
+            else:
+                char_to_lines[root] = [' '.join(diag)]
+    return char_to_lines
+
+'''ERROR ANALYSES'''
+# checking how we normalize from variant to root
 def error_analysis_of_char_names():
     data = get_data()
     data = list(data.values())
@@ -50,8 +74,47 @@ def error_analysis_of_char_names():
                 if '\'S' in var:
                     print(var)
 
+# checking 'important' characters are missing genders
+def error_analysis_of_important_chars():
+    data = get_data()
+    data = list(data.values())
+    non_imp_chars = non_imp_chars_no_gen = imp_chars = imp_chars_no_gen = 0
+    missing = []
+    for i,info in enumerate(data):
+        title = info[0]
+        path = info[4]
+        char_dict = info[5]
+        char2lines = get_char_to_lines(path, char_dict)
+        for char,lines in char2lines.items():
+            if len(lines) > 100:
+                imp_chars += 1
+                if char_dict[char][1] == 'None':
+                    imp_chars_no_gen += 1
+                    if 'agarwal' in path:
+                        source = 'Agarwal'
+                    else:
+                        source = 'Gorinski'
+                    missing.append((title, source, char, len(lines)))
+            else:
+                non_imp_chars += 1
+                if char_dict[char][1] == 'None':
+                    non_imp_chars_no_gen += 1
+    report = ''
+    report += 'Number of important chars: {}\n'.format(imp_chars)
+    report += 'Number of important chars wo gender: {} ({}%)\n'.format(imp_chars_no_gen, round(imp_chars_no_gen * 1.0/imp_chars, 5))
+    report += 'Number of non-important chars: {}\n'.format(non_imp_chars)
+    report += 'Number of non-important chars wo gender: {} ({}%)\n'.format(non_imp_chars_no_gen, round(non_imp_chars_no_gen * 1.0/non_imp_chars, 5))
+    print(report)
+
+    missing = sorted(missing, key=lambda x: x[3], reverse=True)  # order by most lines to least (priority)
+
+    with open('./data/missing_imp_chars_gen.txt', 'w') as f:
+        f.write(report)
+        f.write('\n')
+        for title, source, char, num_lines in missing:
+            f.write('{} (from {}), {}, {} lines\n'.format(title, source, char, num_lines))
 
 if __name__ == "__main__":
     # combined_data = get_data()
     # print(check_distribution(combined_data))
-    error_analysis_of_char_names()
+    error_analysis_of_important_chars()
