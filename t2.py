@@ -216,8 +216,8 @@ class T2RuleBased:
 
 class T2Classifier:
     def __init__(self, verbose = False):
-        self.clf = DecisionTreeClassifier()
-        # best - self.clf = LinearSVC(class_weight={0:.58, 1:.42})
+        # self.clf = DecisionTreeClassifier()
+        self.clf = LinearSVC(class_weight={0:.58, 1:.42})
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose

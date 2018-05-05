@@ -10,8 +10,9 @@ def get_data(source = 'combined'):
     if source == 'agarwal' or source == 'gorinski':
         id_to_info = {}
         for fname in os.listdir(path + source + '/'):
-            id, info = ag.parse_by_gender_file(path + source + '/' + fname)
-            id_to_info[id] = info
+            if not fname.startswith('.DS_Store'):
+                id, info = ag.parse_by_gender_file(path + source + '/' + fname)
+                id_to_info[id] = info
         return id_to_info
 
     elif source == 'combined':
@@ -82,9 +83,15 @@ def error_analysis_of_important_chars():
     missing = []
     for i,info in enumerate(data):
         title = info[0]
+        year = info[1]
         path = info[4]
         char_dict = info[5]
-        char2lines = get_char_to_lines(path, char_dict)
+        try:
+            char2lines = get_char_to_lines(path, char_dict)
+        except ValueError:
+            print(path)
+            print(char_dict)
+            return
         for char,lines in char2lines.items():
             if len(lines) > 100:
                 imp_chars += 1
@@ -94,7 +101,7 @@ def error_analysis_of_important_chars():
                         source = 'Agarwal'
                     else:
                         source = 'Gorinski'
-                    missing.append((title, source, char, len(lines)))
+                    missing.append((title, year, source, char, len(lines)))
             else:
                 non_imp_chars += 1
                 if char_dict[char][1] == 'None':
@@ -106,13 +113,24 @@ def error_analysis_of_important_chars():
     report += 'Number of non-important chars wo gender: {} ({}%)\n'.format(non_imp_chars_no_gen, round(non_imp_chars_no_gen * 1.0/non_imp_chars, 5))
     print(report)
 
-    missing = sorted(missing, key=lambda x: x[3], reverse=True)  # order by most lines to least (priority)
+    missing = sorted(missing, key=lambda x: x[4], reverse=True)  # order by most lines to least (priority)
 
-    with open('./data/missing_imp_chars_gen.txt', 'w') as f:
+    with open('./output/missing_imp_chars_gen.txt', 'w') as f:
         f.write(report)
         f.write('\n')
-        for title, source, char, num_lines in missing:
-            f.write('{} (from {}), {}, {} lines\n'.format(title, source, char, num_lines))
+        for title, year, source, char, num_lines in missing:
+            f.write('{} {} (from {}), {}, {} lines\n'.format(title, year, source, char, num_lines))
+
+def testing_changes():
+    data = get_data()
+    sample_changed = data['0093409']
+    print(sample_changed)
+    title = sample_changed[0]
+    year = sample_changed[1]
+    path = sample_changed[4]
+    char_dict = sample_changed[5]
+    char2lines = get_char_to_lines(path, char_dict)
+    print(char2lines)
 
 if __name__ == "__main__":
     # combined_data = get_data()

@@ -205,7 +205,7 @@ def write_to_file(row, root_to_info, save_dir):
 
     return found
 
-# returns title, year, imdb_id, bechdel, path, char_dict
+# returns id, [title, year, imdb_id, bechdel, path, char_dict]
 def parse_by_gender_file(path_to_file):
     with open(path_to_file, 'r') as f:
         lines = f.readlines()

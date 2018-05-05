@@ -146,8 +146,8 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        self.clf = DecisionTreeClassifier()
-        # best - self.clf = LinearSVC(class_weight={0: .9, 1: .1})
+        # self.clf = DecisionTreeClassifier()
+        self.clf = LinearSVC(class_weight={0: .9, 1: .1})
         self.trained = False
 
     def transform(self, X):
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
 
     # for test_type in ['all', 'agarwal']:
-        # print('\nEvaluating on', test_type.upper(), 'data...')
-        # eval_rule_based(test=test_type)
+    #     print('\nEvaluating on', test_type.upper(), 'data...')
+    #     eval_rule_based(test=test_type)
 
     for test_type in ['all_cv', 'agarwal_cv']:
         print('\nEvaluating on', test_type.upper(), 'data...')
