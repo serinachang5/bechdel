@@ -1,7 +1,7 @@
 import align_gender as ag
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
 from t2 import T2RuleBased, T2Classifier
-from util import get_data, check_distribution
+import util as ut
 import social_network_analysis as sna
 
 from collections import Counter
@@ -19,7 +19,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 '''PREPARE DATA'''
 def get_t3_data(source = 'combined'):
-    data = get_data(source)
+    data = ut.get_data(source)
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
     X = []
     y = []
@@ -29,7 +29,7 @@ def get_t3_data(source = 'combined'):
             X.append((x[0], x[1][4], x[1][5]))  # (id, path, char dict)
             label = 1 if rating == 3 else 0  # check if sample passes T3
             y.append(label)
-    return X, y
+    return np.array(X), np.array(y)
 
 '''EVAL METHODS'''
 def eval(true, pred, verbose = False):
@@ -44,38 +44,27 @@ def eval(true, pred, verbose = False):
 def eval_rule_based(test = 'all'):
     assert(test == 'all' or test == 'agarwal')
     if test == 'all':
-        X, y = get_t3_data()
+        X, _, y, _ = pickle.load(open('t3_split.pkl', 'rb'))
     else:
         X, y = get_t3_data(source = 'agarwal')
 
     X = [(x[1], x[2]) for x in X]
+
     rb = T3RuleBased()
     pred = rb.predict(X)
     print(eval(y, pred, verbose=True))
 
-def eval_clf(test = 'all_cv'):
-    assert(test == 'all_cv' or test == 'agarwal_cv' or test == 'test' )
-    clf = T2Classifier()
+def eval_clf(test = 'all_cv', **kwargs):
+    assert(test == 'all_cv' or test == 'agarwal_cv')
     if test == 'all_cv':
-        X, y = get_t3_data()
-        X = [(x[1], x[2]) for x in X]
-        pred = clf.cross_val(X, y)
-        print(eval(y, pred, verbose=True))
-    elif test == 'agarwal_cv':
-        X, y = get_t3_data(source='agarwal')
-        X = [(x[1], x[2]) for x in X]
-        pred = clf.cross_val(X, y)
-        print(eval(y, pred, verbose=True))
-    else:  # test on test set
-        X_train, X_val, X_test, y_train, y_val, y_test = pickle.load(open('t2_split.p', 'rb'))
-        X_train = np.concatenate((X_train, X_val))
-        X_train = [(x[1], x[2]) for x in X_train]
-        X_test = [(x[1], x[2]) for x in X_test]
-        y_train = np.concatenate((y_train, y_val))
+        X, _, y, _ = pickle.load(open('t3_split.pkl', 'rb'))
+    else:
+        X, y = get_t3_data(source = 'agarwal')
 
-        clf.train(X_train, y_train)
-        pred = clf.predict(X_test)
-        print(eval(y_test, pred, verbose=True))
+    clf = T3Classifier(**kwargs)
+
+    pred = clf.cross_val(X, y)
+    print(eval(y, pred, verbose=True))
 
 
 class T3RuleBased:
@@ -129,55 +118,72 @@ class T3RuleBased:
 
 
 class T3Classifier:
-    def __init__(self, only_ff = True, unigrams_count = 500, verbose = False):
-        self.clf = LinearSVC(class_weight={0:.6, 1:.4})
+    def __init__(self, feats = None, uni_only_ff = True, uni_count = 500, sna_mode = 'consecutive', sna_min_lines = 5, sna_centralities = None, verbose = False):
+        self.clf = LinearSVC(class_weight={0:.7, 1:.3})
+        self.feats = ['UNI', 'SNA'] if feats is None else feats
+
+        self.uni_only_ff = uni_only_ff
+        self.uni_count = uni_count
+
         self.sna = sna.SNA()
+        self.sna_mode = sna_mode
+        self.sna_min_lines = sna_min_lines
+        self.sna_centralities = ['btwn'] if sna_centralities is None else sna_centralities
+
         self.trained = False
-        self.only_ff = only_ff
-        self.uni_count = unigrams_count
         self.verbose = verbose
 
     def transform(self, X):
-        diag_per_movie = []  # diag per movie
-        print('Transforming', len(X), 'samples')
-        # print('Building unigrams model...')
-        # # make corpus to train unigrams model - either all female dialogue or all fem-fem dialogue
-        # for i,(id, path,char_dict) in enumerate(X):
-        #     this_diag = ''
-        #     if i % 50 == 0: print(i)
-        #     if 'agarwal' in path:
-        #         source = 'agarwal'
-        #         scenes = get_boundaries_agarwal(path)
-        #     else:
-        #         source = 'gorinski'
-        #         scenes = get_boundaries_gorinski(path)
-        #     var2info = ag.get_variant_as_key(char_dict)
-        #     for scene in scenes:
-        #         cdl = ag.get_char_diag_list(scene, var2info, source)
-        #         if self.only_ff:
-        #             ffs = ag.get_ff_conversations(cdl)
-        #             for ff in ffs:
-        #                 for char,line in ff:
-        #                     this_diag += line
-        #         else:
-        #             for (char,gen,score),diag in cdl:  # for each character/line
-        #                 if score != 'None' and float(score) > .5:
-        #                     line = ' '.join(diag)
-        #                     if len(line) > 0:
-        #                         this_diag += ' ' + line
-        #     diag_per_movie.append(this_diag)
-        # unigrams = CountVectorizer(max_features=self.uni_count).fit_transform(diag_per_movie)
-        # print(unigrams.shape)
-        #
-        sna_mode = 'consecutive'
-        min_lines = 5
-        centralities = ['degree', 'btwn', 'close', 'eigen']
-        sn_feats = []
-        for i,(id, path, char_dict) in enumerate(X):
-            if i % 50 == 0: print(i)
-            sn_feats.append(self.sna.transform_into_feats(id, sna_mode, min_lines, centralities))
-        sn_feats = np.array(sn_feats)
-        print(sn_feats.shape)
+        print('Transforming {} samples into {}'.format(str(len(X)), ', '.join(self.feats)))
+        feat_mats = []
+
+        if 'UNI' in self.feats:
+            print('Building unigrams model...')
+            # corpus to train unigrams model - either all fem dialogue or all fem-fem dialogue
+            diag_per_movie = []
+            for i,(id, path,char_dict) in enumerate(X):
+                this_diag = ''
+                if self.verbose and i % 50 == 0: print(i)
+                if 'agarwal' in path:
+                    source = 'agarwal'
+                    scenes = get_boundaries_agarwal(path)
+                else:
+                    source = 'gorinski'
+                    scenes = get_boundaries_gorinski(path)
+                var2info = ag.get_variant_as_key(char_dict)
+                for scene in scenes:
+                    cdl = ag.get_char_diag_list(scene, var2info, source)
+                    if self.uni_only_ff:
+                        ffs = ag.get_ff_conversations(cdl)
+                        for ff in ffs:
+                            for char,line in ff:
+                                this_diag += line
+                    else:
+                        for (char,gen,score),diag in cdl:  # for each character/line
+                            if score != 'None' and float(score) > .5:
+                                line = ' '.join(diag)
+                                if len(line) > 0:
+                                    this_diag += ' ' + line
+                diag_per_movie.append(this_diag)
+
+            # transform into bag-of-words unigram model
+            unigrams = CountVectorizer(max_features=self.uni_count).fit_transform(diag_per_movie)
+            print('Unigrams:', unigrams.shape)
+            feat_mats.append(unigrams.toarray())
+
+        if 'SNA' in self.feats:
+            print('Building SNA features...')
+            sn_feats = []
+            for i,(id, path, char_dict) in enumerate(X):
+                if self.verbose and i % 50 == 0: print(i)
+                sn_feats.append(self.sna.transform_into_feats(id, self.sna_mode, self.sna_min_lines, self.sna_centralities))
+            sn_feats = np.array(sn_feats)
+            print('SNA features:', sn_feats.shape)
+            feat_mats.append(sn_feats)
+
+        X = np.concatenate(feat_mats, axis=1)
+        print('X-shape:', X.shape)
+
         return X
 
     def train(self, X, y):
@@ -199,10 +205,13 @@ class T3Classifier:
         return pred
 
 if __name__ == "__main__":
-    # eval_rule_based(test='all')
+    # X, y = get_t3_data()
+    # ut.split_and_save(X, y, save_file='t3_split.pkl')
 
-    X,y = get_t3_data()
-    clf = T3Classifier(only_ff=False)
-    pred = clf.cross_val(X,y,n=5)
-    print(eval(pred, y, verbose=True))
+    # for test_type in ['all', 'agarwal']:
+    #     print('\nEvaluating on', test_type.upper(), 'data...')
+    #     eval_rule_based(test=test_type)
 
+    for test_type in ['all_cv', 'agarwal_cv']:
+        print('\nEvaluating on', test_type.upper(), 'data...')
+        eval_clf(test=test_type, uni_only_ff=False, feats=['UNI'])

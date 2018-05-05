@@ -1,6 +1,5 @@
 import align_gender as ag
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
-from t3 import get_t3_data
 from util import get_data, check_distribution, get_char_to_lines
 import networkx as nx
 import numpy as np
@@ -15,13 +14,24 @@ class SNA:
     def transform_into_feats(self, movie_id, sna_mode, min_lines, cent_modes):
         assert(len(cent_modes) > 0)
         G, char_dict = self.get_network(movie_id, mode=sna_mode, min_lines=min_lines)
-        feats = np.zeros(len(cent_modes) * 4)  # 4 metrics per cent_mode
+
+        feat_len = len(cent_modes) * 4 + 2
+        feats = np.zeros(feat_len)
+
         if len(G.nodes()) == 0:
             return feats
+
+        # calculate centrality stats
         for i, cent_md in enumerate(cent_modes):
             start = i*4
             stats = self.get_gender_cent_stats(G, char_dict, mode=cent_md)
             feats[start:start+4] = stats
+
+        # calculate additional features
+        m_to_f, f_to_f = self.get_connected_to_woman_stats(G, char_dict)
+        feats[len(cent_modes) * 4] = m_to_f
+        feats[len(cent_modes) * 4 + 1] = f_to_f
+
         return feats
 
     def get_network(self, movie_id, mode, min_lines):
@@ -82,6 +92,21 @@ class SNA:
 
         return [f_avg, f_sum, m_avg, m_sum]
 
+    def get_connected_to_woman_stats(self, G, char_dict):
+        m_to_f = set()  # all men connected to a woman
+        f_to_f = set()  # all women connected to a woman
+        for char in G.nodes():
+            score1 = char_dict[char][1]
+            if score1 != 'None' and float(score1) > .5:
+                neighbors = G.neighbors(char)
+                for neigh in neighbors:
+                    score2 = char_dict[neigh][1]
+                    if score2 != 'None':
+                        if float(score2) > .5:
+                            f_to_f.add(neigh)
+                        else:
+                            m_to_f.add(neigh)
+        return len(m_to_f), len(f_to_f)
 
     # make a social network of the characters who have at least <min_lines> lines
     def _build_network(self, path, char_dict, mode, min_lines = 5):
@@ -120,13 +145,13 @@ class SNA:
 
 def test_SNA():
     sna = SNA()
-    id = '0947798'
-    mode = 'consecutive'
+    id = '0250494'
+    mode = 'overlap'
     min_lines = 5
     G, char_dict = sna.get_network(id, mode=mode, min_lines=min_lines)
     for cent in ['degree', 'btwn', 'close', 'eigen']:
         print('\nCentrality type:', cent)
-        sna.get_gender_cent_stats(G, char_dict, mode=cent)
+        print(sna.get_gender_cent_stats(G, char_dict, mode=cent))
 
     sna.plot_network(G, char_dict, movie_title='10 THINGS', mode=mode, min_lines=min_lines)
 

@@ -1,6 +1,6 @@
 import align_gender as ag
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
-from util import get_data, check_distribution
+import util as ut
 
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
@@ -17,7 +17,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 '''PREPARE DATA'''
 def get_t2_data(source = 'combined'):
-    data = get_data(source)
+    data = ut.get_data(source)
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
     X = []
     y = []
@@ -27,34 +27,7 @@ def get_t2_data(source = 'combined'):
             X.append((x[0], x[1][4], x[1][5]))  # (id, path, char dict)
             label = 1 if rating >= 2 else 0  # check if sample passes T2
             y.append(label)
-    return X, y
-
-def split_and_save(X, y, train_prop = .6, val_prop = .2, test_prop = .2):
-    assert((train_prop + val_prop + test_prop) == 1)
-
-    shuffle_indices = list(range(X.shape[0]))
-    np.random.shuffle(shuffle_indices)
-    X = X[shuffle_indices]
-    y = y[shuffle_indices]
-
-    train_cutoff = int(X.shape[0] * train_prop)
-    X_train = X[:train_cutoff]
-    y_train = y[:train_cutoff]
-
-    val_cutoff = train_cutoff + int(X.shape[0] * val_prop)
-    X_val = X[train_cutoff:val_cutoff]
-    y_val = y[train_cutoff:val_cutoff]
-
-    X_test = X[val_cutoff:]
-    y_test = y[val_cutoff:]
-
-    print(Counter(y_train))
-    print(Counter(y_val))
-    print(Counter(y_test))
-
-    pickle.dump([X_train, X_val, X_test, y_train, y_val, y_test], open('t2_split.p', 'wb'))
-    print('Saved t2_split.p')
-    return X_train, X_val, X_test, y_train, y_val, y_test
+    return np.array(X), np.array(y)
 
 
 '''EVAL METHODS'''
@@ -68,14 +41,12 @@ def eval(true, pred, verbose = False):
     return report
 
 def eval_rule_based(test = 'all'):
-    assert(test == 'all' or test == 'test' or test == 'agarwal')
-
+    assert(test == 'all' or test == 'agarwal')
     if test == 'all':
-        X, y = get_t2_data()
-    elif test == 'test':
-        _, _, X, _, _, y = pickle.load(open('t2_split.p', 'rb'))
+        X, _, y, _ = pickle.load(open('t2_split.pkl', 'rb'))
     else:
         X, y = get_t2_data(source = 'agarwal')
+
     X = [(x[1], x[2]) for x in X]
 
     rb = T2RuleBased()
@@ -97,28 +68,18 @@ def eval_rule_based(test = 'all'):
     print(eval(y, pred, verbose=True))
 
 def eval_clf(test = 'all_cv'):
-    assert(test == 'all_cv' or test == 'agarwal_cv' or test == 'test' )
-    clf = T2Classifier()
+    assert(test == 'all_cv' or test == 'agarwal_cv')
     if test == 'all_cv':
-        X, y = get_t2_data()
-        X = [(x[1], x[2]) for x in X]
-        pred = clf.cross_val(X, y)
-        print(eval(y, pred, verbose=True))
-    elif test == 'agarwal_cv':
-        X, y = get_t2_data(source='agarwal')
-        X = [(x[1], x[2]) for x in X]
-        pred = clf.cross_val(X, y)
-        print(eval(y, pred, verbose=True))
-    else:  # test on test set
-        X_train, X_val, X_test, y_train, y_val, y_test = pickle.load(open('t2_split.p', 'rb'))
-        X_train = np.concatenate((X_train, X_val))
-        X_train = [(x[1], x[2]) for x in X_train]
-        X_test = [(x[1], x[2]) for x in X_test]
-        y_train = np.concatenate((y_train, y_val))
+        X, _, y, _ = pickle.load(open('t2_split.pkl', 'rb'))
+    else:
+        X, y = get_t2_data(source = 'agarwal')
 
-        clf.train(X_train, y_train)
-        pred = clf.predict(X_test)
-        print(eval(y_test, pred, verbose=True))
+    X = [(x[1], x[2]) for x in X]
+
+    clf = T2Classifier()
+
+    pred = clf.cross_val(X, y)
+    print(eval(y, pred, verbose=True))
 
 
 class T2RuleBased:
@@ -216,8 +177,8 @@ class T2RuleBased:
 
 class T2Classifier:
     def __init__(self, verbose = False):
-        # self.clf = DecisionTreeClassifier()
-        self.clf = LinearSVC(class_weight={0:.58, 1:.42})
+        self.clf = DecisionTreeClassifier()
+        # self.clf = LinearSVC(class_weight={0:.59, 1:.41})
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
@@ -287,7 +248,7 @@ class T2Classifier:
 
 if __name__ == "__main__":
     # X, y = get_t2_data()
-    # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
+    # ut.split_and_save(X, y, save_file='t2_split.pkl')
 
     # for test_type in ['all', 'agarwal']:
     #     print('\nEvaluating on', test_type.upper(), 'data...')

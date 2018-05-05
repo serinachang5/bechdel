@@ -1,7 +1,6 @@
-from util import get_data, check_distribution, get_char_to_lines
+import util as ut
 import align_gender as ag
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
-
 
 from collections import Counter
 from imblearn.over_sampling import ADASYN, SMOTE, RandomOverSampler
@@ -15,40 +14,15 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 
+
 '''PREPARE DATA'''
 def get_t1_data(source = 'combined'):
-    data = get_data(source)
+    data = ut.get_data(source)
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # (id, path, char dict)
+    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # id, path, char dict
     y = np.array([1 if int(x[1][3]) >= 1 else 0 for x in data], dtype=np.int)  # check if sample passes T1
     return X, y
 
-def split_and_save(X, y, train_prop = .6, val_prop = .2, test_prop = .2):
-    assert((train_prop + val_prop + test_prop) == 1)
-
-    shuffle_indices = list(range(X.shape[0]))
-    np.random.shuffle(shuffle_indices)
-    X = X[shuffle_indices]
-    y = y[shuffle_indices]
-
-    train_cutoff = int(X.shape[0] * train_prop)
-    X_train = X[:train_cutoff]
-    y_train = y[:train_cutoff]
-
-    val_cutoff = train_cutoff + int(X.shape[0] * val_prop)
-    X_val = X[train_cutoff:val_cutoff]
-    y_val = y[train_cutoff:val_cutoff]
-
-    X_test = X[val_cutoff:]
-    y_test = y[val_cutoff:]
-
-    print(Counter(y_train))
-    print(Counter(y_val))
-    print(Counter(y_test))
-
-    pickle.dump([X_train, X_val, X_test, y_train, y_val, y_test], open('t1_split.p', 'wb'))
-    print('Saved t1_split.p')
-    return X_train, X_val, X_test, y_train, y_val, y_test
 
 '''EVAL METHODS'''
 def eval(true, pred, verbose = False):
@@ -61,14 +35,12 @@ def eval(true, pred, verbose = False):
     return report
 
 def eval_rule_based(test = 'all'):
-    assert(test == 'all' or test == 'test' or test == 'agarwal')
-
+    assert(test == 'all' or test == 'agarwal')
     if test == 'all':
-        X, y = get_t1_data()
-    elif test == 'test':
-        _, _, X, _, _, y = pickle.load(open('t1_split.p', 'rb'))
+        X, _, y, _ = pickle.load(open('t1_split.pkl', 'rb'))
     else:
         X, y = get_t1_data(source = 'agarwal')
+
     X = [(x[1], x[2]) for x in X]
 
     rb = T1RuleBased()
@@ -82,34 +54,18 @@ def eval_rule_based(test = 'all'):
     print(eval(y, pred, verbose=True))
 
 def eval_clf(test = 'all_cv'):
-    assert(test == 'all_cv' or test == 'agarwal_cv' or test == 'test' )
-    clf = T1Classifier()
+    assert(test == 'all_cv' or test == 'agarwal_cv')
     if test == 'all_cv':
-        X, y = get_t1_data()
-        X = [(x[1], x[2]) for x in X]
-        pred = clf.cross_val(X, y)
-        print(eval(y, pred, verbose=True))
-    elif test == 'agarwal_cv':
+        X, _, y, _ = pickle.load(open('t1_split.pkl', 'rb'))
+    else:
         X, y = get_t1_data(source='agarwal')
-        X = [(x[1], x[2]) for x in X]
-        pred = clf.cross_val(X, y)
-        print(eval(y, pred, verbose=True))
-    else:  # test on test set
-        X_train, X_val, X_test, y_train, y_val, y_test = pickle.load(open('t1_split.p', 'rb'))
-        X_train = np.concatenate((X_train, X_val))
-        X_train = [(x[1], x[2]) for x in X_train]
-        X_test = [(x[1], x[2]) for x in X_test]
-        y_train = np.concatenate((y_train, y_val))
 
-        print('WITHOUT OVERSAMPLING')
-        clf.train(X_train, y_train, oversample=False)
-        pred = clf.predict(X_test)
-        print(eval(y_test, pred, verbose=True))
+    X = [(x[1], x[2]) for x in X]
 
-        print('WITH OVERSAMPLING')
-        clf.train(X_train, y_train, oversample=True)
-        pred = clf.predict(X_test)
-        print(eval(y_test, pred, verbose=True))
+    clf = T1Classifier()
+
+    pred = clf.cross_val(X, y)
+    print(eval(y, pred, verbose=True))
 
 
 class T1RuleBased:
@@ -146,8 +102,8 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        # self.clf = DecisionTreeClassifier()
-        self.clf = LinearSVC(class_weight={0: .9, 1: .1})
+        # self.clf = KNeighborsClassifier()
+        self.clf = LinearSVC(class_weight={0: .85, 1: .15})
         self.trained = False
 
     def transform(self, X):
@@ -158,11 +114,9 @@ class T1Classifier:
         return feat_mat
 
     def extract_features(self, path, char_dict):
-        char_to_lines = get_char_to_lines(path=path, char_dict=char_dict)
-
-        # num of fems with > 1 lines, num of fems with 1 line
+        char_to_lines = ut.get_char_to_lines(path=path, char_dict=char_dict)
+        # count num of fems with > 1 lines, num of fems with 1 line
         feats = np.zeros(2, dtype=np.int)
-
         for char, lines in char_to_lines.items():
             gen, score, var = char_dict[char]
             if score != 'None' and float(score) > .5:
@@ -170,7 +124,6 @@ class T1Classifier:
                     feats[0] += 1
                 else:
                     feats[1] += 1
-
         return feats
 
     def train(self, X, y, oversample = True):
@@ -197,7 +150,7 @@ class T1Classifier:
 
 if __name__ == "__main__":
     # X, y = get_t1_data()
-    # X_train, X_val, X_test, y_train, y_val, y_test = split_and_save(X, y)
+    # ut.split_and_save(X, y, save_file='t1_split.pkl')
 
     # for test_type in ['all', 'agarwal']:
     #     print('\nEvaluating on', test_type.upper(), 'data...')
@@ -206,8 +159,3 @@ if __name__ == "__main__":
     for test_type in ['all_cv', 'agarwal_cv']:
         print('\nEvaluating on', test_type.upper(), 'data...')
         eval_clf(test=test_type)
-
-    # X,y = get_t1_data(source='combined')
-    # X = [x[1] for x in X]
-    # pred = T1Classifier().cross_val(X, y)
-    # print(eval(y, pred, verbose=True))
