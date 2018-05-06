@@ -126,7 +126,8 @@ class T3RuleBased:
 
 class T3Classifier:
     def __init__(self, feats = None, uni_only_ff = True, uni_count = 1000, sna_mode = 'consecutive', sna_min_lines = 5, sna_centralities = None, frame_mode = 'both', verbose = False):
-        self.clf = LinearSVC(class_weight={0:.45, 1:.55})
+        self.clf = LinearSVC()
+        # self.clf = LinearSVC(class_weight={0:.72, 1:.28})
         self.feats = ['SNA', 'RB'] if feats is None else feats
 
         if 'UNI' in self.feats:
@@ -256,16 +257,20 @@ class T3Classifier:
 
         return X
 
-    def train(self, X, y):
+    def train(self, X, y, add_feat = None):
         X = self.transform(X)
+        if add_feat is not None:
+            X = np.concatenate((X, add_feat), axis=1)
         self.clf.fit(X, y)
         self.trained = True
 
-    def predict(self, X):
+    def predict(self, X, add_feat = None):
         if not self.trained:
             print('Should not predict before training.')
             return None
         X = self.transform(X)
+        if add_feat is not None:
+            X = np.concatenate((X, add_feat), axis=1)
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):

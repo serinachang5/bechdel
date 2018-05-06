@@ -93,7 +93,8 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        self.clf = LinearSVC()
+        # self.clf = KNeighborsClassifier()
+        self.clf = LinearSVC(class_weight={0:.85, 1:.15})
         self.trained = False
 
     def transform(self, X):
@@ -116,19 +117,23 @@ class T1Classifier:
                     feats[1] += 1
         return feats
 
-    def train(self, X, y, oversample = True):
+    def train(self, X, y, add_feat = None, oversample = False):
         X = self.transform(X)
+        if add_feat is not None:
+            X = np.concatenate((X, add_feat), axis=1)
         if oversample:
             oversampler = SMOTE()
             X, y = oversampler.fit_sample(X, y)
         self.clf.fit(X, y)
         self.trained = True
 
-    def predict(self, X):
+    def predict(self, X, add_feat = None):
         if not self.trained:
             print('Should not predict before training.')
             return None
         X = self.transform(X)
+        if add_feat is not None:
+            X = np.concatenate((X, add_feat), axis=1)
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):

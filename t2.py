@@ -171,6 +171,7 @@ class T2RuleBased:
 class T2Classifier:
     def __init__(self, verbose = False):
         self.clf = LinearSVC()
+        # self.clf = LinearSVC(class_weight={0:.58, 1:.42})
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
@@ -216,19 +217,23 @@ class T2Classifier:
             return 1  # has overlap soft
         return 0  # failed
 
-    def train(self, X, y, oversample = False):
+    def train(self, X, y, add_feat = None, oversample = False):
         X = self.transform(X)
+        if add_feat is not None:
+            X = np.concatenate((X, add_feat), axis=1)
         if oversample:
             oversampler = SMOTE()
             X, y = oversampler.fit_sample(X, y)
         self.clf.fit(X, y)
         self.trained = True
 
-    def predict(self, X):
+    def predict(self, X, add_feat = None):
         if not self.trained:
             print('Should not predict before training.')
             return None
         X = self.transform(X)
+        if add_feat is not None:
+            X = np.concatenate((X, add_feat), axis=1)
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
