@@ -60,15 +60,17 @@ def get_interactions_agarwal(agarwal, agarwal_gender_dict):
 			chars = agarwal_gender_dict[matches[0]]
 			with open(matches[1]+"/"+d) as fp:
 				contents = fp.readlines()
-				for c in chars:
-					gender = c[0]
-					variants = c[1:]
-					for v in variants:
-						if any(v in c for c in contents):
-							count_chars += 1
-							if count_chars == 2:
-								fin.append(matches[1]+"/"+d)
-	return fin
+
+				print(matches[1]+"/"+d,chars, contents)
+	# 			for c in chars:
+	# 				gender = c[0]
+	# 				variants = c[1:]
+	# 				for v in variants:
+	# 					if any(v in c for c in contents):
+	# 						count_chars += 1
+	# 						if count_chars == 2:
+	# 							fin.append(matches[1]+"/"+d)
+	# return fin
 
 
 if __name__ == "__main__":
