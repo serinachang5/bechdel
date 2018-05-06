@@ -211,11 +211,13 @@ def get_power_agency_by_interaction_type_mm_ff_by_movie(interaction_type, frames
 
         if words_count != 0:
             with open(key) as fp:
-                movie_id = fp.readlines()[2][9:].strip()
+                contents = fp.readlines()
+                movie_id = contents[2][9:].strip()
+                bechdel_score = contents[3][15:].strip()
             key = key[:-4]
             key = key.split("/")
             key = key[-1]
-            results.append([movie_id, key, \
+            results.append([movie_id, int(bechdel_score), key, \
                 agency_pos_count/words_count, agency_neg_count/words_count, agency_equal_count/words_count, \
                 power_agent_count/words_count, power_theme_count/words_count, power_equal_count/words_count])
     return results
@@ -394,11 +396,13 @@ def get_power_agency_by_interaction_type_fm_by_movie(interaction_type, frames_di
 
         if words_count_f != 0 and words_count_m != 0:
             with open(key) as fp:
-                movie_id = fp.readlines()[2][9:].strip()
+                contents = fp.readlines()
+                movie_id = contents[2][9:].strip()
+                bechdel_score = contents[3][15:].strip()
             key = key[:-4]
             key = key.split("/")
             key = key[-1]
-            results.append([movie_id, key, \
+            results.append([movie_id, int(bechdel_score), key, \
             agency_pos_count_f/words_count_f, agency_neg_count_f/words_count_f, agency_equal_count_f/words_count_f, \
             power_agent_count_f/words_count_f, power_theme_count_f/words_count_f, power_equal_count_f/words_count_f, \
             agency_pos_count_m/words_count_m, agency_neg_count_m/words_count_m, agency_equal_count_m/words_count_m, \
@@ -466,27 +470,27 @@ if __name__ == "__main__":
     e = get_power_agency_by_interaction_type_mm_ff_by_movie(gorinski_interactions_ff, frames)
     f = get_power_agency_by_interaction_type_fm_by_movie(gorinski_interactions_fm, frames)
 
-    # write_to_csv(a, "agarwal_mm.csv", ["movie_id", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
-    #     "power_agency", "power_theme", "power_equal"])
+    write_to_csv(a, "agarwal_mm.csv", ["movie_id", "bechdel_score", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
+        "power_agency", "power_theme", "power_equal"])
 
-    # write_to_csv(b, "agarwal_ff.csv", ["movie_id", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
-    #     "power_agency", "power_theme", "power_equal"])
+    write_to_csv(b, "agarwal_ff.csv", ["movie_id", "bechdel_score", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
+        "power_agency", "power_theme", "power_equal"])
 
-    # write_to_csv(c, "agarwal_fm.csv", ["movie_id", "movie_year", "agency_pos_f", "agency_neg_f", "agency_equal_f", \
-    #     "power_agency_f", "power_theme_f", "power_equal_f", \
-    #     "agency_pos_m", "agency_neg_m", "agency_equal_m", \
-    #     "power_agency_m", "power_theme_m", "power_equal_m"])
+    write_to_csv(c, "agarwal_fm.csv", ["movie_id", "bechdel_score", "movie_year", "agency_pos_f", "agency_neg_f", "agency_equal_f", \
+        "power_agency_f", "power_theme_f", "power_equal_f", \
+        "agency_pos_m", "agency_neg_m", "agency_equal_m", \
+        "power_agency_m", "power_theme_m", "power_equal_m"])
 
-    # write_to_csv(d, "gorinski_mm.csv", ["movie_id", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
-    #     "power_agency", "power_theme", "power_equal"])
+    write_to_csv(d, "gorinski_mm.csv", ["movie_id", "bechdel_score", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
+        "power_agency", "power_theme", "power_equal"])
 
-    # write_to_csv(e, "gorinski_ff.csv", ["movie_id", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
-    #     "power_agency", "power_theme", "power_equal"])
+    write_to_csv(e, "gorinski_ff.csv", ["movie_id", "bechdel_score", "movie_year", "agency_pos", "agency_neg", "agency_equal", \
+        "power_agency", "power_theme", "power_equal"])
 
-    # write_to_csv(f, "gorinski_fm.csv", ["movie_id", "movie_year", "agency_pos_f", "agency_neg_f", "agency_equal_f", \
-    #     "power_agency_f", "power_theme_f", "power_equal_f", \
-    #     "agency_pos_m", "agency_neg_m", "agency_equal_m", \
-    #     "power_agency_m", "power_theme_m", "power_equal_m"])
+    write_to_csv(f, "gorinski_fm.csv", ["movie_id", "bechdel_score", "movie_year", "agency_pos_f", "agency_neg_f", "agency_equal_f", \
+        "power_agency_f", "power_theme_f", "power_equal_f", \
+        "agency_pos_m", "agency_neg_m", "agency_equal_m", \
+        "power_agency_m", "power_theme_m", "power_equal_m"])
 
 
 
