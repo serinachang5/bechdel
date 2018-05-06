@@ -15,12 +15,18 @@ from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 
 
-'''PREPARE DATA'''
-def get_t1_data(source = 'combined'):
-    data = ut.get_data(source)
-    data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # id, path, char dict
-    y = np.array([1 if int(x[1][3]) >= 1 else 0 for x in data], dtype=np.int)  # check if sample passes T1
+def get_t1_data(test):
+    assert(test == 'train' or test == 'agarwal')
+    if test == 'train':
+        X, _, y, _ = pickle.load(open('train_test.pkl', 'rb'))
+        X = [(x[1], x[2]) for x in X]  # path, char_dict (don't need id)
+    else:
+        agarwal_data = ut.get_data(source='agarwal')
+        data = list(agarwal_data.items())
+        X = np.array([(x[1][4], x[1][5]) for x in data])  # path, char dict
+        y = np.array([int(x[1][3]) for x in data])  # Bechdel label
+
+    y = np.array([1 if label >= 1 else 0 for label in y])  # check if sample passes T1
     return X, y
 
 
@@ -34,15 +40,8 @@ def eval(true, pred, verbose = False):
         report += '\n' + str(confusion_matrix(true, pred))
     return report
 
-def eval_rule_based(test = 'all'):
-    assert(test == 'all' or test == 'agarwal')
-    if test == 'all':
-        X, _, y, _ = pickle.load(open('t1_split.pkl', 'rb'))
-    else:
-        X, y = get_t1_data(source = 'agarwal')
-
-    X = [(x[1], x[2]) for x in X]
-
+def eval_rule_based(test):
+    X, y = get_t1_data(test)
     rb = T1RuleBased()
 
     print('RULE-BASED: HARD')
@@ -53,17 +52,9 @@ def eval_rule_based(test = 'all'):
     pred = rb.predict(X, mode='soft')
     print(eval(y, pred, verbose=True))
 
-def eval_clf(test = 'all_cv'):
-    assert(test == 'all_cv' or test == 'agarwal_cv')
-    if test == 'all_cv':
-        X, _, y, _ = pickle.load(open('t1_split.pkl', 'rb'))
-    else:
-        X, y = get_t1_data(source='agarwal')
-
-    X = [(x[1], x[2]) for x in X]
-
+def eval_clf(test):
+    X, y = get_t1_data(test)
     clf = T1Classifier()
-
     pred = clf.cross_val(X, y)
     print(eval(y, pred, verbose=True))
 
@@ -102,8 +93,7 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        # self.clf = KNeighborsClassifier()
-        self.clf = LinearSVC(class_weight={0: .85, 1: .15})
+        self.clf = LinearSVC()
         self.trained = False
 
     def transform(self, X):
@@ -142,20 +132,17 @@ class T1Classifier:
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
-        print('Distribution:', Counter(y))
+        # print('Distribution:', Counter(y))
         X = self.transform(X)
         pred = cross_val_predict(self.clf, X, y, cv=n)
         return pred
 
 
 if __name__ == "__main__":
-    # X, y = get_t1_data()
-    # ut.split_and_save(X, y, save_file='t1_split.pkl')
-
-    # for test_type in ['all', 'agarwal']:
+    # for test_type in ['train', 'agarwal']:
     #     print('\nEvaluating on', test_type.upper(), 'data...')
     #     eval_rule_based(test=test_type)
 
-    for test_type in ['all_cv', 'agarwal_cv']:
+    for test_type in ['train', 'agarwal']:
         print('\nEvaluating on', test_type.upper(), 'data...')
         eval_clf(test=test_type)

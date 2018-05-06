@@ -1,6 +1,8 @@
+from collections import Counter
 import align_gender as ag
 import os
 import numpy as np
+import pickle
 import random
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
 
@@ -39,6 +41,27 @@ def check_distribution(data, test = None):
             label = 1 if score >= test else 0
             counts[label] += 1
     return counts
+
+def split_and_save(X, y, save_file, train_prop = .7, test_prop = .3):
+    assert((train_prop + test_prop) == 1)
+
+    shuffle_indices = list(range(X.shape[0]))
+    np.random.shuffle(shuffle_indices)
+    X = X[shuffle_indices]
+    y = y[shuffle_indices]
+
+    train_cutoff = int(X.shape[0] * train_prop)
+    X_train = X[:train_cutoff]
+    y_train = y[:train_cutoff]
+
+    X_test = X[train_cutoff:]
+    y_test = y[train_cutoff:]
+
+    print(Counter(y_train))
+    print(Counter(y_test))
+
+    pickle.dump([X_train, X_test, y_train, y_test], open(save_file, 'wb'))
+    print('Saved', save_file)
 
 # get char mapped to all their lines
 def get_char_to_lines(path, char_dict):
@@ -135,4 +158,9 @@ def testing_changes():
 if __name__ == "__main__":
     # combined_data = get_data()
     # print(check_distribution(combined_data))
-    error_analysis_of_important_chars()
+    # error_analysis_of_important_chars()
+    data = get_data()
+    data = sorted(data.items(), key=lambda x: x[0])  # sort by id
+    X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # id, path, char dict
+    y = np.array([int(x[1][3]) for x in data])  # Bechdel label
+    split_and_save(X,y,'train_test.pkl')

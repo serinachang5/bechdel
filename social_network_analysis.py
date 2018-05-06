@@ -4,6 +4,7 @@ from util import get_data, check_distribution, get_char_to_lines
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
 
 
 class SNA:

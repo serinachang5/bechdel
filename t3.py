@@ -1,4 +1,5 @@
 import align_gender as ag
+import csv
 from get_scene_boundaries import get_boundaries_agarwal, get_boundaries_gorinski
 from t2 import T2RuleBased, T2Classifier
 import util as ut
@@ -16,20 +17,29 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import MinMaxScaler
 
 '''PREPARE DATA'''
-def get_t3_data(source = 'combined'):
-    data = ut.get_data(source)
-    data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = []
-    y = []
-    for x in data:
-        rating = int(x[1][3])
-        if rating >= 2:  # only include those that passed 2
-            X.append((x[0], x[1][4], x[1][5]))  # (id, path, char dict)
-            label = 1 if rating == 3 else 0  # check if sample passes T3
-            y.append(label)
-    return np.array(X), np.array(y)
+def get_t3_data(test):
+    assert(test == 'train' or test == 'agarwal')
+    if test == 'train':
+        X, _, y, _ = pickle.load(open('train_test.pkl', 'rb'))
+    else:
+        agarwal_data = ut.get_data(source='agarwal')
+        data = list(agarwal_data.items())
+        X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # id, path, char dict
+        y = np.array([int(x[1][3]) for x in data])  # Bechdel label
+
+    X_include = []
+    y_include = []
+    for movie,label in zip(X,y):
+        if label >= 2:  # only include movies that already passed T2
+            X_include.append(movie)
+            label = 1 if label == 3 else 0
+            y_include.append(label)
+
+    return X_include, y_include
+
 
 '''EVAL METHODS'''
 def eval(true, pred, verbose = False):
@@ -41,26 +51,15 @@ def eval(true, pred, verbose = False):
         report += '\n' + str(confusion_matrix(true, pred))
     return report
 
-def eval_rule_based(test = 'all'):
-    assert(test == 'all' or test == 'agarwal')
-    if test == 'all':
-        X, _, y, _ = pickle.load(open('t3_split.pkl', 'rb'))
-    else:
-        X, y = get_t3_data(source = 'agarwal')
-
-    X = [(x[1], x[2]) for x in X]
-
+def eval_rule_based(test):
+    X, y = get_t3_data(test)
+    X = [(x[1], x[2]) for x in X]  # don't need id for rule-based
     rb = T3RuleBased()
     pred = rb.predict(X)
     print(eval(y, pred, verbose=True))
 
-def eval_clf(test = 'all_cv', **kwargs):
-    assert(test == 'all_cv' or test == 'agarwal_cv')
-    if test == 'all_cv':
-        X, _, y, _ = pickle.load(open('t3_split.pkl', 'rb'))
-    else:
-        X, y = get_t3_data(source = 'agarwal')
-
+def eval_clf(test, **kwargs):
+    X, y = get_t3_data(test)
     clf = T3Classifier(**kwargs)
 
     pred = clf.cross_val(X, y)
@@ -68,7 +67,8 @@ def eval_clf(test = 'all_cv', **kwargs):
 
 
 class T3RuleBased:
-    def __init__(self, verbose = False):
+    def __init__(self, binary = True, verbose = False):
+        self.binary = binary
         self.verbose = verbose
 
     def predict(self, X):
@@ -88,14 +88,21 @@ class T3RuleBased:
         male_chars = self.get_male_chars(char_dict)  # soft mode
         var2info = ag.get_variant_as_key(char_dict)
 
+        no_man_ff = 0
+        ff_count = 0
         for scene in scenes:
             cdl = ag.get_char_diag_list(scene, var2info, source)
             ffs = ag.get_ff_conversations(cdl)
+            ff_count += len(ffs)
             # len(ffs) > 0 means it passes consecutive soft
             for ff in ffs:
                 if self.no_man_conversation(ff, male_chars):
-                    return 1
-        return 0
+                    no_man_ff += 1
+                    if self.binary:
+                        return 1
+        if self.binary:
+            return 0
+        return no_man_ff, ff_count
 
     def get_male_chars(self, char_dict):
         male_chars = set()
@@ -118,27 +125,60 @@ class T3RuleBased:
 
 
 class T3Classifier:
-    def __init__(self, feats = None, uni_only_ff = True, uni_count = 500, sna_mode = 'consecutive', sna_min_lines = 5, sna_centralities = None, verbose = False):
-        self.clf = LinearSVC(class_weight={0:.7, 1:.3})
-        self.feats = ['UNI', 'SNA'] if feats is None else feats
+    def __init__(self, feats = None, uni_only_ff = True, uni_count = 1000, sna_mode = 'consecutive', sna_min_lines = 5, sna_centralities = None, frame_mode = 'both', verbose = False):
+        self.clf = LinearSVC(class_weight={0:.45, 1:.55})
+        self.feats = ['SNA', 'RB'] if feats is None else feats
 
-        self.uni_only_ff = uni_only_ff
-        self.uni_count = uni_count
+        if 'UNI' in self.feats:
+            self.uni_only_ff = uni_only_ff
+            self.uni_count = uni_count
+            self.countvec = None
 
-        self.sna = sna.SNA()
-        self.sna_mode = sna_mode
-        self.sna_min_lines = sna_min_lines
-        self.sna_centralities = ['btwn'] if sna_centralities is None else sna_centralities
+        if 'SNA' in self.feats:
+            self.sna = sna.SNA()
+            self.sna_mode = sna_mode
+            self.sna_min_lines = sna_min_lines
+            self.sna_centralities = ['btwn'] if sna_centralities is None else sna_centralities
+
+        if 'FRA' in self.feats:
+            self._load_frames()
+            self.fr_mode = frame_mode
+
+        if 'RB' in self.feats:
+            self.rb = T3RuleBased(binary=False)
 
         self.trained = False
         self.verbose = verbose
 
+    def _load_frames(self):
+        all_data = ut.get_data()
+        self.id2frames = dict((id, {'ff':np.zeros(6), 'fm':np.zeros(12), 'mm':np.zeros(6)}) for id in all_data)
+        agarwal_ids = set()
+        for source in ['agarwal', 'gorinski']:
+            for type in ['ff', 'fm', 'mm']:
+                fname = './frames_data/' + source + '/' + source + '_' + type + '.csv'
+                with open(fname, 'r') as f:
+                    # DictReader returns OrderedDict so values always come in the same order
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        id = row['movie_id']
+                        padding = '0' * (7 - len(id))
+                        id = padding + id
+                        # set scores if agarwal OR gorinski and agarwal didn't already set
+                        if id in self.id2frames and (source == 'agarwal' or id not in agarwal_ids):
+                            row.pop('movie_id', None)
+                            row.pop('movie_year', None)
+                            feats = np.array([float(x) for x in row.values()])
+                            self.id2frames[id][type] = feats
+                            if source == 'agarwal':
+                                agarwal_ids.add(id)
+
     def transform(self, X):
-        print('Transforming {} samples into {}'.format(str(len(X)), ', '.join(self.feats)))
+        if self.verbose: print('Transforming {} samples into {}'.format(str(len(X)), ', '.join(self.feats)))
         feat_mats = []
 
         if 'UNI' in self.feats:
-            print('Building unigrams model...')
+            if self.verbose: print('Building UNIGRAMS model...')
             # corpus to train unigrams model - either all fem dialogue or all fem-fem dialogue
             diag_per_movie = []
             for i,(id, path,char_dict) in enumerate(X):
@@ -167,22 +207,52 @@ class T3Classifier:
                 diag_per_movie.append(this_diag)
 
             # transform into bag-of-words unigram model
-            unigrams = CountVectorizer(max_features=self.uni_count).fit_transform(diag_per_movie)
-            print('Unigrams:', unigrams.shape)
+            if self.countvec is None:  # train
+                self.countvec = CountVectorizer(max_features=self.uni_count)
+                unigrams = self.countvec.fit_transform(diag_per_movie)
+            else:  # test
+                unigrams = self.countvec.transform(diag_per_movie)
+            if self.verbose: print('Unigrams:', unigrams.shape)
             feat_mats.append(unigrams.toarray())
 
         if 'SNA' in self.feats:
-            print('Building SNA features...')
+            if self.verbose: print('Building SNA features...')
             sn_feats = []
             for i,(id, path, char_dict) in enumerate(X):
                 if self.verbose and i % 50 == 0: print(i)
                 sn_feats.append(self.sna.transform_into_feats(id, self.sna_mode, self.sna_min_lines, self.sna_centralities))
             sn_feats = np.array(sn_feats)
-            print('SNA features:', sn_feats.shape)
+            if self.verbose: print('SNA features:', sn_feats.shape)
             feat_mats.append(sn_feats)
 
+        if 'FRA' in self.feats:
+            if self.verbose: print('Building FRAME features...')
+            fr_feats = []
+            for i,(id, path, char_dict) in enumerate(X):
+                if self.verbose and i % 50 == 0: print (i)
+                scores = self.id2frames[id]
+                if self.fr_mode == 'both':
+                    feats = np.concatenate((scores['ff'], scores['fm'], scores['mm']), axis=0)
+                elif self.fr_mode == 'agency':
+                    feats = np.concatenate((scores['ff'][:3], scores['fm'][:3], scores['fm'][6:9], scores['mm'][:3]), axis=0)
+                else: # power
+                    feats = np.concatenate((scores['ff'][3:], scores['fm'][3:6], scores['fm'][9:], scores['mm'][3:]), axis=0)
+                fr_feats.append(feats)
+            fr_feats = np.array(fr_feats)
+            fr_feats = MinMaxScaler().fit_transform(fr_feats)
+            if self.verbose: print('FRAME features:', fr_feats.shape)
+            feat_mats.append(fr_feats)
+
+        if 'RB' in self.feats:
+            if self.verbose: print('Building RULE-BASED features...')
+            X_rb = [(x[1], x[2]) for x in X]
+            rb_feats = self.rb.predict(X_rb)
+            rb_feats = np.array(rb_feats)
+            if self.verbose: print('RB features:', rb_feats.shape)
+            feat_mats.append(rb_feats)
+
         X = np.concatenate(feat_mats, axis=1)
-        print('X-shape:', X.shape)
+        if self.verbose: print('X-shape:', X.shape)
 
         return X
 
@@ -199,19 +269,17 @@ class T3Classifier:
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
-        print('Distribution:', Counter(y))
+        # print('Distribution:', Counter(y))
         X = self.transform(X)
         pred = cross_val_predict(self.clf, X, y, cv=n)
         return pred
 
-if __name__ == "__main__":
-    # X, y = get_t3_data()
-    # ut.split_and_save(X, y, save_file='t3_split.pkl')
 
-    # for test_type in ['all', 'agarwal']:
+if __name__ == "__main__":
+    # for test_type in ['train', 'agarwal']:
     #     print('\nEvaluating on', test_type.upper(), 'data...')
     #     eval_rule_based(test=test_type)
 
-    for test_type in ['all_cv', 'agarwal_cv']:
+    for test_type in ['train', 'agarwal']:
         print('\nEvaluating on', test_type.upper(), 'data...')
-        eval_clf(test=test_type, uni_only_ff=False, feats=['UNI'])
+        eval_clf(test=test_type, feats=['SNA', 'RB'], uni_count = 1000, uni_only_ff=False, sna_mode = 'consecutive', frame_mode ='power')

@@ -16,18 +16,26 @@ from sklearn.tree import DecisionTreeClassifier
 
 
 '''PREPARE DATA'''
-def get_t2_data(source = 'combined'):
-    data = ut.get_data(source)
-    data = sorted(data.items(), key=lambda x: x[0])  # sort by id
-    X = []
-    y = []
-    for x in data:
-        rating = int(x[1][3])
-        if rating >= 1:  # only include those that passed 1
-            X.append((x[0], x[1][4], x[1][5]))  # (id, path, char dict)
-            label = 1 if rating >= 2 else 0  # check if sample passes T2
-            y.append(label)
-    return np.array(X), np.array(y)
+def get_t2_data(test):
+    assert(test == 'train' or test == 'agarwal')
+    if test == 'train':
+        X, _, y, _ = pickle.load(open('train_test.pkl', 'rb'))
+        X = [(x[1], x[2]) for x in X]  # path, char_dict (don't need id)
+    else:
+        agarwal_data = ut.get_data(source='agarwal')
+        data = list(agarwal_data.items())
+        X = np.array([(x[1][4], x[1][5]) for x in data])  # path, char dict
+        y = np.array([int(x[1][3]) for x in data])  # Bechdel label
+
+    X_include = []
+    y_include = []
+    for movie,label in zip(X,y):
+        if label >= 1:  # only include movies that already passed T1
+            X_include.append(movie)
+            label = 1 if label >= 2 else 0
+            y_include.append(label)
+
+    return X_include, y_include
 
 
 '''EVAL METHODS'''
@@ -40,15 +48,8 @@ def eval(true, pred, verbose = False):
         report += '\n' + str(confusion_matrix(true, pred))
     return report
 
-def eval_rule_based(test = 'all'):
-    assert(test == 'all' or test == 'agarwal')
-    if test == 'all':
-        X, _, y, _ = pickle.load(open('t2_split.pkl', 'rb'))
-    else:
-        X, y = get_t2_data(source = 'agarwal')
-
-    X = [(x[1], x[2]) for x in X]
-
+def eval_rule_based(test):
+    X, y = get_t2_data(test)
     rb = T2RuleBased()
 
     print('RULE-BASED: OVERLAP, HARD')
@@ -67,17 +68,9 @@ def eval_rule_based(test = 'all'):
     pred = rb.predict(X, interact='consecutive', mode='soft')
     print(eval(y, pred, verbose=True))
 
-def eval_clf(test = 'all_cv'):
-    assert(test == 'all_cv' or test == 'agarwal_cv')
-    if test == 'all_cv':
-        X, _, y, _ = pickle.load(open('t2_split.pkl', 'rb'))
-    else:
-        X, y = get_t2_data(source = 'agarwal')
-
-    X = [(x[1], x[2]) for x in X]
-
+def eval_clf(test):
+    X, y = get_t2_data(test)
     clf = T2Classifier()
-
     pred = clf.cross_val(X, y)
     print(eval(y, pred, verbose=True))
 
@@ -86,7 +79,7 @@ class T2RuleBased:
     def __init__(self, verbose = False):
         self.verbose = verbose
 
-    def predict(self, X, interact = 'overlap', mode = 'hard'):
+    def predict(self, X, interact = 'consecutive', mode = 'soft'):
         assert(interact == 'overlap' or interact == 'consecutive')
         assert(mode == 'hard' or mode == 'soft')
         if interact == 'overlap':
@@ -177,8 +170,7 @@ class T2RuleBased:
 
 class T2Classifier:
     def __init__(self, verbose = False):
-        self.clf = DecisionTreeClassifier()
-        # self.clf = LinearSVC(class_weight={0:.59, 1:.41})
+        self.clf = LinearSVC()
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
@@ -240,20 +232,17 @@ class T2Classifier:
         return self.clf.predict(X)
 
     def cross_val(self, X, y, n = 5):
-        print('Distribution:', Counter(y))
+        # print('Distribution:', Counter(y))
         X = self.transform(X)
         pred = cross_val_predict(self.clf, X, y, cv=n)
         return pred
 
 
 if __name__ == "__main__":
-    # X, y = get_t2_data()
-    # ut.split_and_save(X, y, save_file='t2_split.pkl')
-
-    # for test_type in ['all', 'agarwal']:
+    # for test_type in ['train', 'agarwal']:
     #     print('\nEvaluating on', test_type.upper(), 'data...')
     #     eval_rule_based(test=test_type)
 
-    for test_type in ['all_cv', 'agarwal_cv']:
+    for test_type in ['train', 'agarwal']:
         print('\nEvaluating on', test_type.upper(), 'data...')
         eval_clf(test=test_type)
