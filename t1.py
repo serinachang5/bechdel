@@ -93,8 +93,7 @@ class T1RuleBased:
 
 class T1Classifier:
     def __init__(self):
-        # self.clf = KNeighborsClassifier()
-        self.clf = LinearSVC(class_weight={0:.85, 1:.15})
+        self.clf = LinearSVC(class_weight={0:.85, 1:.15}) # 0 vs 1-3
         self.trained = False
 
     def transform(self, X):

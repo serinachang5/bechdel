@@ -156,11 +156,11 @@ def testing_changes():
     print(char2lines)
 
 if __name__ == "__main__":
-    # combined_data = get_data()
+    data = get_data('agarwal')
     # print(check_distribution(combined_data))
     # error_analysis_of_important_chars()
-    data = get_data()
+    # data = get_data()
     data = sorted(data.items(), key=lambda x: x[0])  # sort by id
     X = np.array([(x[0], x[1][4], x[1][5]) for x in data])  # id, path, char dict
     y = np.array([int(x[1][3]) for x in data])  # Bechdel label
-    split_and_save(X,y,'train_test.pkl')
+    split_and_save(X,y,'agarwal_train_test.pkl')

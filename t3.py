@@ -125,9 +125,13 @@ class T3RuleBased:
 
 
 class T3Classifier:
-    def __init__(self, feats = None, uni_only_ff = True, uni_count = 1000, sna_mode = 'consecutive', sna_min_lines = 5, sna_centralities = None, frame_mode = 'both', verbose = False):
-        self.clf = LinearSVC()
-        # self.clf = LinearSVC(class_weight={0:.72, 1:.28})
+    def __init__(self, version = 'local', feats = None, uni_only_ff = True, uni_count = 1000, sna_mode = 'consecutive', sna_min_lines = 5, sna_centralities = None, frame_mode = 'both', verbose = False):
+        assert(version == 'local' or version == 'global')
+        if version == 'global':
+            self.clf = LinearSVC(class_weight={0:.45, 1:.55}) # 0-2 vs 3
+        else:
+            self.clf = LinearSVC(class_weight={0:.72, 1:.28}) # 2 vs 3
+
         self.feats = ['SNA', 'RB'] if feats is None else feats
 
         if 'UNI' in self.feats:
@@ -236,8 +240,18 @@ class T3Classifier:
                     feats = np.concatenate((scores['ff'], scores['fm'], scores['mm']), axis=0)
                 elif self.fr_mode == 'agency':
                     feats = np.concatenate((scores['ff'][:3], scores['fm'][:3], scores['fm'][6:9], scores['mm'][:3]), axis=0)
-                else: # power
+                elif self.fr_mode == 'power': # power
                     feats = np.concatenate((scores['ff'][3:], scores['fm'][3:6], scores['fm'][9:], scores['mm'][3:]), axis=0)
+                elif self.fr_mode == 'ff':
+                    feats = scores['ff']
+                elif self.fr_mode == 'fm':
+                    feats = scores['fm']
+                elif self.fr_mode == 'ffmm':
+                    feats = np.concatenate((scores['ff'], scores['mm']), axis=0)
+                elif self.fr_mode == 'mm':
+                    feats = scores['mm']
+                else:
+                    raise ValueError('Invalid frame mode:', self.fr_mode)
                 fr_feats.append(feats)
             fr_feats = np.array(fr_feats)
             fr_feats = MinMaxScaler().fit_transform(fr_feats)
@@ -287,4 +301,4 @@ if __name__ == "__main__":
 
     for test_type in ['train', 'agarwal']:
         print('\nEvaluating on', test_type.upper(), 'data...')
-        eval_clf(test=test_type, feats=['SNA', 'RB'], uni_count = 1000, uni_only_ff=False, sna_mode = 'consecutive', frame_mode ='power')
+        eval_clf(test=test_type, feats=['FRA', 'RB'], uni_count=1000, uni_only_ff=False, sna_mode='consecutive', frame_mode ='ff', verbose=False)

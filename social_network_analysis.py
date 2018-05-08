@@ -16,22 +16,29 @@ class SNA:
         assert(len(cent_modes) > 0)
         G, char_dict = self.get_network(movie_id, mode=sna_mode, min_lines=min_lines)
 
-        feat_len = len(cent_modes) * 4 + 2
+        feat_len = len(cent_modes) * 4 + 3
         feats = np.zeros(feat_len)
 
         if len(G.nodes()) == 0:
             return feats
 
+        f_chars, m_chars = self.find_gendered_chars(G, char_dict)
+
         # calculate centrality stats
         for i, cent_md in enumerate(cent_modes):
             start = i*4
-            stats = self.get_gender_cent_stats(G, char_dict, mode=cent_md)
+            stats = self.get_gender_cent_stats(G, f_chars, m_chars, mode=cent_md)
             feats[start:start+4] = stats
 
-        # calculate additional features
-        m_to_f, f_to_f = self.get_connected_to_woman_stats(G, char_dict)
+        # calculate connected to women stats
+        f_to_f, m_to_f = self.get_connected_to_woman_stats(G, f_chars, m_chars)
         feats[len(cent_modes) * 4] = m_to_f
         feats[len(cent_modes) * 4 + 1] = f_to_f
+
+        # calculate clique stats: % women in ffm clique; # of women in all f clique
+        percent_ffm, num_all_f = self.get_clique_stats(G, f_chars, m_chars)
+        feats[len(cent_modes) * 4 + 2] = percent_ffm
+        # feats[len(cent_modes) * 4 + 3] = num_all_f
 
         return feats
 
@@ -60,9 +67,22 @@ class SNA:
             else:
                 cmap.append('#D8DCD6') # light grey
 
-        nx.draw_networkx(G, node_size=200, node_color=cmap)
+        # nx.draw_networkx(G, node_size=200, node_color=cmap)
+        nx.draw(G, node_color=cmap) # without names
         plt.title('Social network from ' + movie_title + ' (mode={}, min_lines={})'.format(mode, min_lines))
         plt.show()
+
+    def find_gendered_chars(self, G, char_dict):
+        f_chars = set()
+        m_chars = set()
+        for char in G.nodes():
+            score = char_dict[char][1]
+            if score != 'None':
+                if float(score) > .5:
+                    f_chars.add(char)
+                else:
+                    m_chars.add(char)
+        return f_chars, m_chars
 
     def get_centralities(self, G, mode='degree'):
         assert(mode == 'degree' or mode == 'btwn' or mode == 'close' or mode == 'eigen')
@@ -75,17 +95,16 @@ class SNA:
         else:
             return nx.eigenvector_centrality(G)
 
-    def get_gender_cent_stats(self, G, char_dict, mode='degree'):
+    def get_gender_cent_stats(self, G, f_chars, m_chars, mode='degree'):
         cents = self.get_centralities(G, mode=mode)
         f_cent = []
         m_cent = []
         for char, cent in cents.items():
-            gen_score = char_dict[char][1]
-            if gen_score != 'None':
-                if float(gen_score) > .5:
-                    f_cent.append(cent)
-                else:
-                    m_cent.append(cent)
+            if char in f_chars:
+                f_cent.append(cent)
+            elif char in m_chars:
+                m_cent.append(cent)
+
         f_avg = 0 if len(f_cent) == 0 else np.mean(f_cent)
         f_sum = np.sum(f_cent)
         m_avg = 0 if len(m_cent) == 0 else np.mean(m_cent)
@@ -93,21 +112,43 @@ class SNA:
 
         return [f_avg, f_sum, m_avg, m_sum]
 
-    def get_connected_to_woman_stats(self, G, char_dict):
-        m_to_f = set()  # all men connected to a woman
+    def get_connected_to_woman_stats(self, G, f_chars, m_chars):
+        if len(f_chars) == 0:
+            return 0, 0
+
         f_to_f = set()  # all women connected to a woman
+        m_to_f = set()  # all men connected to a woman
         for char in G.nodes():
-            score1 = char_dict[char][1]
-            if score1 != 'None' and float(score1) > .5:
+            if char in f_chars:
                 neighbors = G.neighbors(char)
                 for neigh in neighbors:
-                    score2 = char_dict[neigh][1]
-                    if score2 != 'None':
-                        if float(score2) > .5:
-                            f_to_f.add(neigh)
-                        else:
-                            m_to_f.add(neigh)
-        return len(m_to_f), len(f_to_f)
+                    if neigh in f_chars:
+                        f_to_f.add(neigh)
+                    elif neigh in m_chars:
+                        m_to_f.add(neigh)
+        return len(f_to_f), len(m_to_f)
+
+    def get_clique_stats(self, G, f_chars, m_chars):
+        if len(f_chars) == 0:
+            return 0, 0
+
+        f_in_ffm = set()
+        f_in_all_f = set()
+        cliques = nx.algorithms.find_cliques(G)
+        for cl in cliques:
+            if len(cl) > 2:
+                f_in_cl = set()
+                m_in_cl = set()
+                for node in cl:
+                    if node in f_chars:
+                        f_in_cl.add(node)
+                    elif node in m_chars:
+                        m_in_cl.add(node)
+                if len(cl) == 3 and len(f_in_cl) == 2 and len(m_in_cl) == 1:  # ffm clique
+                    f_in_ffm = f_in_ffm.union(f_in_cl)
+                elif len(cl) == len(f_in_cl):  # all f clique
+                    f_in_all_f = f_in_all_f.union(f_in_cl)
+        return len(f_in_ffm) / len(f_chars), len(f_in_all_f)
 
     # make a social network of the characters who have at least <min_lines> lines
     def _build_network(self, path, char_dict, mode, min_lines = 5):
@@ -146,13 +187,14 @@ class SNA:
 
 def test_SNA():
     sna = SNA()
-    id = '0250494'
-    mode = 'overlap'
+    id = '0147800'
+    mode = 'consecutive'
     min_lines = 5
     G, char_dict = sna.get_network(id, mode=mode, min_lines=min_lines)
+    f_chars, m_chars = sna.find_gendered_chars(G, char_dict)
     for cent in ['degree', 'btwn', 'close', 'eigen']:
         print('\nCentrality type:', cent)
-        print(sna.get_gender_cent_stats(G, char_dict, mode=cent))
+        print(sna.get_gender_cent_stats(G, f_chars, m_chars, mode=cent))
 
     sna.plot_network(G, char_dict, movie_title='10 THINGS', mode=mode, min_lines=min_lines)
 

@@ -169,9 +169,13 @@ class T2RuleBased:
 
 
 class T2Classifier:
-    def __init__(self, verbose = False):
-        self.clf = LinearSVC()
-        # self.clf = LinearSVC(class_weight={0:.58, 1:.42})
+    def __init__(self, version='local', verbose = False):
+        assert(version == 'local' or version == 'global')
+        if version == 'global':
+            self.clf = LinearSVC() # 0-1 vs 2-3
+        else:
+            self.clf = LinearSVC(class_weight={0:.58, 1:.42}) # 1 vs 2-3
+
         self.rb = T2RuleBased(verbose=verbose)
         self.trained = False
         self.verbose = verbose
